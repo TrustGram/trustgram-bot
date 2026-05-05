@@ -12,7 +12,7 @@ app = FastAPI()
 
 @dp.message()
 async def echo(message: types.Message):
-    await message.answer(f"Echo: {message.text}")
+    await message.answer(f"your message : {message.text}")
 
 @app.on_event("startup")
 async def on_startup():
