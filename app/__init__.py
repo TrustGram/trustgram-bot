@@ -1,0 +1,1 @@
+# trustgram-bot application package
