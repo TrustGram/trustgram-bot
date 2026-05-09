@@ -1,14 +1,14 @@
 # trustgram-bot
 
-The backend and Telegram bot for [TrustGram](https://github.com/trustgram). 
+The backend and Telegram bot for [TrustGram](https://github.com/trustgram).
 
 Its primary role is to act as a **Zero-Trust Key Server and Message Relay**. It stores encrypted message blobs and public cryptographic bundles, but never sees plaintext or private keys.
 
 ## Core Responsibilities
 
-1.  **Key Server (X3DH)**: Stores and distributes users' public key bundles (Identity Key, Signed PreKey, One-time PreKeys).
-2.  **Message Relay**: Provides a store-and-forward mechanism for encrypted message blobs (inboxes).
-3.  **Telegram Interface**: Serves as the entry point via the Telegram Mini App button and sends real-time notifications.
+1. **Key Server (X3DH)**: Stores and distributes users' public key bundles (Identity Key, Signed PreKey, One-time PreKeys).
+2. **Message Relay**: Provides a store-and-forward mechanism for encrypted message blobs (inboxes).
+3. **Telegram Interface**: Serves as the entry point via the Telegram Mini App button and sends real-time notifications.
 
 ## Tech Stack
 
@@ -21,11 +21,13 @@ Its primary role is to act as a **Zero-Trust Key Server and Message Relay**. It 
 ## API Endpoints (v1)
 
 ### 🔑 Key Management
+
 - `POST /api/v1/keys/register`: Initial upload of the public bundle.
 - `GET /api/v1/keys/{telegram_id}`: Fetch Bob's bundle to start an X3DH session.
 - `POST /api/v1/keys/otk`: Refill one-time pre-keys when they run low.
 
 ### ✉️ Messaging
+
 - `POST /api/v1/chat/send`: Upload an encrypted blob for a recipient.
 - `GET /api/v1/chat/inbox`: Fetch pending encrypted messages.
 - `DELETE /api/v1/chat/message/{id}`: Acknowledge and remove message from server.
@@ -95,7 +97,7 @@ DATABASE_URL=sqlite+aiosqlite:///./trustgram.db
 ```
 
 | Variable | Required | Description |
-|----------|----------|-------------|
+| --- | --- | --- |
 | `BOT_TOKEN` | ✅ | Telegram bot token from @BotFather |
 | `WEBAPP_URL` | ✅ | Public URL of the TrustGram Mini App |
 | `DATABASE_URL` | ❌ | Defaults to local SQLite file (`trustgram.db`) |
@@ -107,7 +109,7 @@ DATABASE_URL=sqlite+aiosqlite:///./trustgram.db
 uvicorn app.main:app --reload
 ```
 
-The server starts at **http://127.0.0.1:8000**. On first launch, SQLite tables are created automatically.
+The server starts at **<http://127.0.0.1:8000>**. On first launch, SQLite tables are created automatically.
 
 ### 6. Verify
 
@@ -124,12 +126,37 @@ You can test all endpoints directly using the interactive documentation:
 2. **ReDoc**: [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
 
 ### Local Testing Bypass
+
 To test without a real Telegram `initData` string:
+
 1. Set `DEBUG=true` in your `.env`.
 2. Leave the `X-Init-Data` header empty in Swagger.
 3. The server will automatically use a **Mock User (ID: 12345678)**.
 
+## Running Tests
+
+The project includes an automated test suite powered by `pytest`. The tests use an isolated in-memory SQLite database and mock the Telegram WebApp authentication, so they won't affect your local database.
+
+### Running the Suite
+
+First, ensure you have the test dependencies installed:
+
+```bash
+pip install -r requirements-dev.txt
+```
+
+Execute the tests (you'll need to provide a mock bot token since `aiogram` validates it on startup):
+
+```bash
+# Linux / macOS
+BOT_TOKEN="mock_token" pytest tests -v
+
+# Windows (PowerShell)
+$env:BOT_TOKEN="mock_token"; pytest tests -v
+```
+
 ## Security Design
+
 - **No Plaintext**: The server never receives unencrypted message content.
 - **Rate Limiting**: Protection against spam and key-exhaustion attacks.
 - **Telegram Validation**: Every API request is validated using `initData` hash from Telegram WebApp.

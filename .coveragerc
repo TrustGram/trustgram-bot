@@ -1,0 +1,12 @@
+[run]
+source = app
+concurrency = thread,greenlet
+
+[report]
+exclude_lines =
+    # Standard pragmas
+    pragma: no cover
+    # Abstract method stubs
+    raise NotImplementedError
+    # Type-checking only imports
+    if TYPE_CHECKING:
