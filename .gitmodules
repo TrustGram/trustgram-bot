@@ -1,0 +1,3 @@
+[submodule "trustgram-bot.wiki"]
+	path = trustgram-bot.wiki
+	url = git@github.com:TrustGram/trustgram-bot.wiki.git

@@ -41,6 +41,3 @@ coverage.xml
 # ── OS artifacts ─────────────────────────────────────────────
 .DS_Store
 Thumbs.db
-
-# ── Documentation ────────────────────────────────────────────
-trustgram-bot.wiki/
