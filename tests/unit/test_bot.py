@@ -42,6 +42,20 @@ class TestOnStartup:
 
         mock_bot.set_chat_menu_button.assert_called_once()
 
+    @pytest.mark.asyncio
+    async def test_on_startup_handles_exception_gracefully(self):
+        """on_startup should catch exceptions during menu button setup and log a warning."""
+        from app.bot import bot as bot_module
+        
+        mock_bot = MagicMock()
+        mock_bot.set_chat_menu_button = AsyncMock(side_effect=Exception("API Error"))
+
+        with patch.object(bot_module, "bot", mock_bot):
+            # This should not raise an exception
+            await bot_module.on_startup()
+
+        mock_bot.set_chat_menu_button.assert_called_once()
+
 
 class TestOnShutdown:
     @pytest.mark.asyncio

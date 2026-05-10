@@ -44,6 +44,21 @@ class TestLifespan:
 
             mock_shutdown.assert_called_once()
 
+    @pytest.mark.asyncio
+    async def test_lifespan_init_db_failure_raises_exception(self):
+        """If init_db fails, the lifespan should log the error and re-raise it."""
+        from app.main import lifespan
+        
+        with (
+            patch("app.main.init_db", side_effect=Exception("DB Connection Failed")),
+            patch("app.main.logger.error") as mock_log_error
+        ):
+            with pytest.raises(Exception, match="DB Connection Failed"):
+                async with lifespan(None):
+                    pass
+            
+            mock_log_error.assert_called_once()
+
 
 class TestWebhookEndpoint:
     @pytest.mark.asyncio
