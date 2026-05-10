@@ -33,7 +33,6 @@ class Settings(BaseSettings):
     log_to_file: bool = True
     log_to_console: bool = True
 
-    debug: bool = False
 
 
 settings = Settings()  # type: ignore[call-arg]

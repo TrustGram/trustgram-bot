@@ -101,7 +101,6 @@ DATABASE_URL=sqlite+aiosqlite:///./trustgram.db
 | `BOT_TOKEN` | ✅ | Telegram bot token from @BotFather |
 | `WEBAPP_URL` | ✅ | Public URL of the TrustGram Mini App |
 | `DATABASE_URL` | ❌ | Defaults to local SQLite file (`trustgram.db`) |
-| `DEBUG` | ❌ | Set to `true` to enable SQL query logging |
 
 ### 5. Run the server
 
@@ -125,13 +124,8 @@ You can test all endpoints directly using the interactive documentation:
 1. **Swagger UI**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 2. **ReDoc**: [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
 
-### Local Testing Bypass
-
-To test without a real Telegram `initData` string:
-
-1. Set `DEBUG=true` in your `.env`.
-2. Leave the `X-Init-Data` header empty in Swagger.
-3. The server will automatically use a **Mock User (ID: 12345678)**.
+### Authentication
+To test endpoints that require authentication, you must provide a valid `X-Init-Data` header containing the `initData` string from the Telegram Mini App.
 
 ## Running Tests
 

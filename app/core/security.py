@@ -79,19 +79,7 @@ async def get_current_user(
 ) -> dict:
     """
     FastAPI dependency that extracts and validates the Telegram user.
-
-    DEBUG MODE: If settings.debug is True and the header is missing,
-    it returns a mock user for local API testing.
     """
-    if settings.debug and not x_init_data:
-        return {
-            "id": 12345678,
-            "first_name": "Test",
-            "last_name": "User",
-            "username": "test_user",
-            "language_code": "en"
-        }
-
     if not x_init_data:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

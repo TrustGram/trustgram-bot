@@ -7,8 +7,7 @@ Covers
 - _validate_init_data: missing hash → 403
 - _validate_init_data: invalid hash → 403
 - _validate_init_data: missing user field → 403
-- get_current_user: debug mode + no header → mock user
-- get_current_user: no header, debug=False → 403
+- get_current_user: missing header → 403
 - get_current_user: valid header in production mode → delegates to _validate_init_data
 """
 
@@ -112,19 +111,9 @@ class TestValidateInitData:
 
 class TestGetCurrentUser:
     @pytest.mark.asyncio
-    async def test_debug_mode_no_header_returns_mock(self):
-        with patch("app.core.security.settings") as mock_settings:
-            mock_settings.debug = True
-            result = await get_current_user(x_init_data=None)
-        assert result["id"] == 12345678
-        assert result["username"] == "test_user"
-
-    @pytest.mark.asyncio
-    async def test_production_no_header_raises_403(self):
-        with patch("app.core.security.settings") as mock_settings:
-            mock_settings.debug = False
-            with pytest.raises(HTTPException) as exc:
-                await get_current_user(x_init_data=None)
+    async def test_no_header_raises_403(self):
+        with pytest.raises(HTTPException) as exc:
+            await get_current_user(x_init_data=None)
         assert exc.value.status_code == 403
         assert "Missing X-Init-Data" in exc.value.detail
 
@@ -132,7 +121,6 @@ class TestGetCurrentUser:
     async def test_valid_header_delegates_to_validate(self):
         init_data = _build_valid_init_data(FAKE_TOKEN, FAKE_USER)
         with patch("app.core.security.settings") as mock_settings:
-            mock_settings.debug = False
             mock_settings.bot_token = FAKE_TOKEN
             result = await get_current_user(x_init_data=init_data)
         assert result["id"] == 42

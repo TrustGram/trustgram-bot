@@ -13,8 +13,6 @@ def setup_logging():
     """
     # 1. Determine Level (String to logging constant)
     level_str = settings.log_level.upper()
-    if settings.debug:
-        level_str = "DEBUG"
     
     level = getattr(logging, level_str, logging.INFO)
     
@@ -46,9 +44,8 @@ def setup_logging():
     )
 
     # 4. Library Tweaks
-    if not settings.debug:
-        logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
-    
+    logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)    
+
     # Sync uvicorn logs
     for name in ["uvicorn.access", "uvicorn.error"]:
         logger_lib = logging.getLogger(name)

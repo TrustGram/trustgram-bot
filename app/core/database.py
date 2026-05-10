@@ -18,7 +18,7 @@ from app.core.logger import logger
 logger.info(f"Connecting to database at: {settings.database_url}")
 engine = create_async_engine(
     settings.database_url,
-    echo=settings.debug,
+    echo=False,
     future=True,
 )
 

@@ -4,9 +4,8 @@ import pytest
 from app.core.logger import setup_logging
 
 def test_setup_logging_production_level():
-    """Test setup_logging sets WARNING for sqlalchemy when not in debug mode."""
+    """Test setup_logging sets WARNING for sqlalchemy."""
     with patch("app.core.logger.settings") as mock_settings:
-        mock_settings.debug = False
         mock_settings.log_level = "INFO"
         mock_settings.log_to_console = True
         mock_settings.log_to_file = False
@@ -27,7 +26,7 @@ def test_setup_logging_production_level():
 def test_setup_logging_file_handler_creation():
     """Test that log directory is created when log_to_file is True."""
     with patch("app.core.logger.settings") as mock_settings:
-        mock_settings.debug = True
+        mock_settings.log_level = "INFO"
         mock_settings.log_to_file = True
         mock_settings.log_file_path = "test_logs/test.log"
         mock_settings.log_to_console = False
@@ -46,7 +45,6 @@ def test_setup_logging_file_handler_creation():
 def test_setup_logging_invalid_level_defaults_to_info():
     """If an invalid log level string is provided, it should default to INFO."""
     with patch("app.core.logger.settings") as mock_settings:
-        mock_settings.debug = False
         mock_settings.log_level = "INVALID_LEVEL"
         mock_settings.log_to_console = True
         mock_settings.log_to_file = False
