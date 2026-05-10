@@ -125,7 +125,19 @@ You can test all endpoints directly using the interactive documentation:
 2. **ReDoc**: [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
 
 ### Authentication
-To test endpoints that require authentication, you must provide a valid `X-Init-Data` header containing the `initData` string from the Telegram Mini App.
+
+To test endpoints that require authentication, you must provide a valid `X-Init-Data` header.
+
+#### Generating a Local Auth Header
+
+Since the backend verifies Telegram HMAC signatures, you can use the provided utility script to generate a valid header for local testing:
+
+```bash
+# Generate header for a mock user (requires BOT_TOKEN in .env)
+python scripts/gen_auth.py --user-id 12345 --username dev_user
+```
+
+Copy the generated string and paste it into the **X-Init-Data** field in Swagger UI or use it as a header in `curl`. For more details, see the [CLI Auth Generator](https://github.com/TrustGram/trustgram-bot/wiki/CLI-Auth-Generator) documentation.
 
 ## Running Tests
 
