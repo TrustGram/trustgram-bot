@@ -1,0 +1,49 @@
+# ── Version control ───────────────────────────────────────────
+.git/
+.github/
+.gitignore
+.gitmodules
+
+# ── Python artifacts ──────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+.venv/
+
+# ── Testing ───────────────────────────────────────────────────
+tests/
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+
+# ── Database (local) ─────────────────────────────────────────
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# ── IDE / editor ─────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── Logs (runtime only) ──────────────────────────────────────
+logs/
+*.log
+
+# ── Docker / Compose ─────────────────────────────────────────
+docker-compose*.yml
+Dockerfile
+
+# ── Documentation ────────────────────────────────────────────
+trustgram-bot.wiki/
+README.md
+LICENSE
+
+# ── OS artifacts ─────────────────────────────────────────────
+.DS_Store
+Thumbs.db

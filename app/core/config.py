@@ -41,9 +41,8 @@ class Settings(BaseSettings):
     log_to_console: bool = True
 
     # ── Docs access ───────────────────────────────────────────
-    environment: str = "development"   # "development" | "production"
-    docs_api_key: str | None = None    # required to access /docs on prod
-
+    environment: str = "development"  # "development" | "production"
+    docs_api_key: str | None = None  # required to access /docs on prod
 
 
 settings = Settings()  # type: ignore[call-arg]

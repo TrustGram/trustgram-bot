@@ -18,6 +18,7 @@ dp = Dispatcher()
 
 # ── Handlers ──────────────────────────────────────────────────
 
+
 @dp.message()
 async def fallback_handler(message: types.Message) -> None:
     """
@@ -31,6 +32,7 @@ async def fallback_handler(message: types.Message) -> None:
 
 
 # ── Lifecycle ─────────────────────────────────────────────────
+
 
 async def on_startup() -> None:
     """
@@ -48,11 +50,9 @@ async def on_startup() -> None:
         )
         logger.info(f"Successfully set Chat Menu Button to: {settings.webapp_url}")
     except Exception as e:
-        # If the WebApp URL is invalid or the bot is restricted, 
+        # If the WebApp URL is invalid or the bot is restricted,
         # we don't want to crash the whole backend.
         logger.warning(f"Could not set chat menu button: {e}")
-
-
 
 
 async def on_shutdown() -> None:

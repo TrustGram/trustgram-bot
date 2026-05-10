@@ -14,8 +14,12 @@ Its primary role is to act as a **Zero-Trust Key Server and Message Relay**. It 
 
 - **Framework**: [FastAPI](https://fastapi.tiangolo.com/) (High-performance API)
 - **Telegram Logic**: [aiogram](https://docs.aiogram.dev/) (Asynchronous TG Bot API)
-- **Database**: [SQLite](https://www.sqlite.org/) (for MVP) / [PostgreSQL](https://www.postgresql.org/) (for production)
-- **ORM**: [SQLAlchemy](https://www.sqlalchemy.org/) or [Tortoise-ORM](https://tortoise.github.io/)
+- **Database**: [SQLite](https://www.sqlite.org/) (dev) / [PostgreSQL](https://www.postgresql.org/) + asyncpg (prod)
+- **ORM**: [SQLAlchemy](https://www.sqlalchemy.org/) (async)
+- **Migrations**: [Alembic](https://alembic.sqlalchemy.org/)
+- **Containerization**: [Docker](https://www.docker.com/) + Docker Compose
+- **CI/CD**: [GitHub Actions](https://github.com/features/actions)
+- **Linting**: [Ruff](https://docs.astral.sh/ruff/)
 - **Hosting**: [Render](https://render.com/)
 
 ## API Endpoints (v1)
@@ -105,10 +109,26 @@ DATABASE_URL=sqlite+aiosqlite:///./trustgram.db
 ### 5. Run the server
 
 ```bash
+# Apply database migrations first
+alembic upgrade head
+
+# Start the server
 uvicorn app.main:app --reload
 ```
 
-The server starts at **<http://127.0.0.1:8000>**. On first launch, SQLite tables are created automatically.
+The server starts at **<http://127.0.0.1:8000>**.
+
+### Alternative: Docker Compose
+
+```bash
+# Start PostgreSQL + app with hot-reload
+docker compose up
+
+# Or start only PostgreSQL, run app locally
+docker compose up -d db
+alembic upgrade head
+uvicorn app.main:app --reload
+```
 
 ### 6. Verify
 

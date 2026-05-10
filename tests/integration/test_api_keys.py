@@ -21,7 +21,6 @@ POST /api/v1/keys/otk
 import pytest
 from httpx import AsyncClient
 
-
 BUNDLE_PAYLOAD = {
     "identity_key": "base64_ik",
     "signed_pre_key": "base64_spk",

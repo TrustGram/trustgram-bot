@@ -3,6 +3,9 @@ Async SQLAlchemy engine & session factory.
 
 All database access goes through `get_db()` which yields a scoped
 `AsyncSession` and commits/rolls-back automatically.
+
+Schema changes are managed by **Alembic** — see ``alembic/`` and run
+``alembic upgrade head`` to apply pending migrations.
 """
 
 from sqlalchemy.ext.asyncio import (
@@ -31,13 +34,8 @@ async_session_factory = async_sessionmaker(
 
 class Base(DeclarativeBase):
     """Shared declarative base for every ORM model."""
+
     pass
-
-
-async def init_db() -> None:
-    """Create tables if they don't exist yet (MVP convenience)."""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
 
 
 async def get_db() -> AsyncSession:  # type: ignore[misc]

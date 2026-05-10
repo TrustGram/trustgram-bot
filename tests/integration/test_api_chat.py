@@ -136,9 +136,7 @@ class TestDeleteMessage:
         pass
 
     @pytest.mark.asyncio
-    async def test_delete_other_users_message_via_db(
-        self, client: AsyncClient, db_session
-    ):
+    async def test_delete_other_users_message_via_db(self, client: AsyncClient, db_session):
         """Uses the db_session fixture to insert a message for user 77777777 and
         verify that the mock user (12345678) cannot delete it."""
         from app.models.models import Message

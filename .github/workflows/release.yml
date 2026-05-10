@@ -1,0 +1,97 @@
+# ── Release Pipeline ──────────────────────────────────────────
+#
+# Triggered when a PR from develop is merged into main.
+# 1. Reads the version from the VERSION file.
+# 2. Runs the full test suite one final time.
+# 3. Creates a Git tag vX.Y.Z.
+# 4. Generates release notes from commit history.
+# 5. Publishes a GitHub Release with the changelog.
+
+name: Release
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+jobs:
+  release:
+    name: Tag & Publish Release
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    env:
+      BOT_TOKEN: "mock_token"
+      WEBAPP_URL: "https://test.example.com"
+      DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # ── Final test gate ─────────────────────────────────────
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run tests
+        run: pytest tests -v --cov=app --cov-fail-under=90
+
+      # ── Read version ────────────────────────────────────────
+      - name: Read VERSION
+        id: version
+        run: echo "version=$(cat VERSION)" >> $GITHUB_OUTPUT
+
+      # ── Check tag doesn't already exist ─────────────────────
+      - name: Verify tag is new
+        run: |
+          if git rev-parse "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+            echo "::error::Tag v${{ steps.version.outputs.version }} already exists!"
+            exit 1
+          fi
+
+      # ── Create & push tag ──────────────────────────────────
+      - name: Create Git tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${{ steps.version.outputs.version }}" \
+            -m "Release v${{ steps.version.outputs.version }}"
+          git push origin "v${{ steps.version.outputs.version }}"
+
+      # ── Generate release notes ──────────────────────────────
+      - name: Build changelog
+        id: notes
+        run: |
+          PREV_TAG=$(git tag --sort=-creatordate | head -2 | tail -1)
+          if [ -z "$PREV_TAG" ] || [ "$PREV_TAG" = "v${{ steps.version.outputs.version }}" ]; then
+            NOTES=$(git log --pretty=format:"- %s (%h)" HEAD)
+          else
+            NOTES=$(git log --pretty=format:"- %s (%h)" "$PREV_TAG"..HEAD)
+          fi
+          {
+            echo "notes<<EOF"
+            echo "$NOTES"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      # ── Publish GitHub Release ──────────────────────────────
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Release v${{ steps.version.outputs.version }}
+          body: |
+            ## What's Changed
+
+            ${{ steps.notes.outputs.notes }}
+
+            ---
+            *Full changelog: https://github.com/${{ github.repository }}/compare/${{ github.event.pull_request.base.sha }}...v${{ steps.version.outputs.version }}*
+          generate_release_notes: true

@@ -48,10 +48,12 @@ async def register_bundle(
     existing_user = await db.get(User, telegram_id)
     if not existing_user:
         logger.info(f"New user registration: {telegram_id}")
-        db.add(User(
-            telegram_id=telegram_id,
-            username=user.get("username"),
-        ))
+        db.add(
+            User(
+                telegram_id=telegram_id,
+                username=user.get("username"),
+            )
+        )
     else:
         logger.debug(f"Updating keys for existing user: {telegram_id}")
 
@@ -65,21 +67,25 @@ async def register_bundle(
         bundle.signed_pre_key = body.signed_pre_key
         bundle.signature = body.signature
     else:
-        db.add(PublicBundle(
-            user_id=telegram_id,
-            identity_key=body.identity_key,
-            signed_pre_key=body.signed_pre_key,
-            signature=body.signature,
-        ))
+        db.add(
+            PublicBundle(
+                user_id=telegram_id,
+                identity_key=body.identity_key,
+                signed_pre_key=body.signed_pre_key,
+                signature=body.signature,
+            )
+        )
 
     # Store one-time pre-keys.
     for otk in body.one_time_keys:
-        db.add(OneTimeKey(
-            user_id=telegram_id,
-            key_id=otk.key_id,
-            public_key=otk.public_key,
-        ))
-    
+        db.add(
+            OneTimeKey(
+                user_id=telegram_id,
+                key_id=otk.key_id,
+                public_key=otk.public_key,
+            )
+        )
+
     logger.info(f"Bundle registered for {telegram_id} with {len(body.one_time_keys)} OTKs")
     return StatusResponse(detail="Bundle registered")
 
@@ -112,11 +118,7 @@ async def get_bundle(
         )
 
     # Pop one OTK (first-come, first-served).
-    otk_stmt = (
-        select(OneTimeKey)
-        .where(OneTimeKey.user_id == telegram_id)
-        .limit(1)
-    )
+    otk_stmt = select(OneTimeKey).where(OneTimeKey.user_id == telegram_id).limit(1)
     otk_result = await db.execute(otk_stmt)
     otk = otk_result.scalar_one_or_none()
 
@@ -154,11 +156,13 @@ async def refill_otk(
     telegram_id: int = user["id"]
 
     for otk in body.one_time_keys:
-        db.add(OneTimeKey(
-            user_id=telegram_id,
-            key_id=otk.key_id,
-            public_key=otk.public_key,
-        ))
+        db.add(
+            OneTimeKey(
+                user_id=telegram_id,
+                key_id=otk.key_id,
+                public_key=otk.public_key,
+            )
+        )
 
     logger.info(f"User {telegram_id} refilled {len(body.one_time_keys)} OTKs")
     return StatusResponse(detail=f"Added {len(body.one_time_keys)} one-time keys")

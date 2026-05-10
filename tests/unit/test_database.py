@@ -3,8 +3,10 @@ Unit tests for app/core/database.py.
 
 Covers
 ------
-- init_db: creates tables against a real in-memory engine.
 - get_db: yields a session, commits on success, rolls back on error.
+
+Note: ``init_db()`` was removed in favour of Alembic migrations.
+Table creation in tests is handled by ``Base.metadata.create_all`` directly.
 """
 
 import pytest
@@ -14,35 +16,9 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from app.core.database import Base, get_db, init_db
+from app.core.database import Base, get_db
 
 TEST_URL = "sqlite+aiosqlite:///:memory:"
-
-
-class TestInitDb:
-    @pytest.mark.asyncio
-    async def test_init_db_creates_tables(self):
-        """init_db must create all ORM tables without errors."""
-        engine = create_async_engine(TEST_URL, echo=False, future=True)
-
-        # Temporarily override the module-level engine used by init_db.
-        import app.core.database as db_module
-        original_engine = db_module.engine
-        db_module.engine = engine
-        try:
-            await init_db()
-            # Check that the tables exist by inspecting the engine.
-            async with engine.connect() as conn:
-                from sqlalchemy import text
-                result = await conn.execute(text("SELECT name FROM sqlite_master WHERE type='table'"))
-                tables = {row[0] for row in result.fetchall()}
-            assert "users" in tables
-            assert "public_bundles" in tables
-            assert "one_time_keys" in tables
-            assert "messages" in tables
-        finally:
-            db_module.engine = original_engine
-            await engine.dispose()
 
 
 class TestGetDb:
@@ -54,12 +30,11 @@ class TestGetDb:
             await conn.run_sync(Base.metadata.create_all)
 
         import app.core.database as db_module
+
         original_engine = db_module.engine
         original_factory = db_module.async_session_factory
         db_module.engine = engine
-        db_module.async_session_factory = async_sessionmaker(
-            bind=engine, class_=AsyncSession, expire_on_commit=False
-        )
+        db_module.async_session_factory = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
         try:
             gen = get_db()
             session = await gen.__anext__()
@@ -82,12 +57,11 @@ class TestGetDb:
             await conn.run_sync(Base.metadata.create_all)
 
         import app.core.database as db_module
+
         original_engine = db_module.engine
         original_factory = db_module.async_session_factory
         db_module.engine = engine
-        db_module.async_session_factory = async_sessionmaker(
-            bind=engine, class_=AsyncSession, expire_on_commit=False
-        )
+        db_module.async_session_factory = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
         try:
             gen = get_db()
             session = await gen.__anext__()

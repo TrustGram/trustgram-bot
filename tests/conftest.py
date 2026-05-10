@@ -11,10 +11,10 @@ Strategy
   integration test runs against the in-memory DB and a mock Telegram user.
 """
 
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -33,9 +33,9 @@ _bot_patch = patch("aiogram.Bot", return_value=_mock_bot)
 _bot_patch.start()
 
 # Now it's safe to import app code.
-from app.main import app  # noqa: E402
 from app.core.database import Base, get_db  # noqa: E402
 from app.core.security import get_current_user  # noqa: E402
+from app.main import app  # noqa: E402
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
@@ -52,6 +52,7 @@ MOCK_USER = {
 
 # ── Database fixtures ────────────────────────────────────────────────────────
 
+
 @pytest.fixture()
 async def async_engine():
     """Create a fresh async SQLite engine with all tables for each test."""
@@ -67,14 +68,13 @@ async def async_engine():
 @pytest.fixture()
 async def db_session(async_engine):
     """Yield a transactional AsyncSession backed by the in-memory engine."""
-    factory = async_sessionmaker(
-        bind=async_engine, class_=AsyncSession, expire_on_commit=False
-    )
+    factory = async_sessionmaker(bind=async_engine, class_=AsyncSession, expire_on_commit=False)
     async with factory() as session:
         yield session
 
 
 # ── HTTP client fixture ──────────────────────────────────────────────────────
+
 
 @pytest.fixture()
 async def client(db_session):
@@ -98,9 +98,7 @@ async def client(db_session):
     app.dependency_overrides[get_db] = _override_get_db
     app.dependency_overrides[get_current_user] = _override_get_current_user
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
 
     app.dependency_overrides.clear()

@@ -2,10 +2,10 @@
 SQLAlchemy ORM models for TrustGram.
 
 Schema mirrors the README spec:
-  - Users           — Telegram users who have registered.
-  - PublicBundles    — X3DH identity + signed pre-key per user.
-  - OneTimeKeys     — Expendable one-time pre-keys (consumed on first use).
-  - Messages        — Store-and-forward encrypted blobs (the "inbox").
+  - Users           вЂ” Telegram users who have registered.
+  - PublicBundles    вЂ” X3DH identity + signed pre-key per user.
+  - OneTimeKeys     вЂ” Expendable one-time pre-keys (consumed on first use).
+  - Messages        вЂ” Store-and-forward encrypted blobs (the "inbox").
 """
 
 from datetime import datetime, timezone
@@ -30,7 +30,9 @@ class User(Base):
     __tablename__ = "users"
 
     telegram_id: Mapped[int] = mapped_column(
-        BigInteger, primary_key=True, index=True,
+        BigInteger,
+        primary_key=True,
+        index=True,
     )
     username: Mapped[str | None] = mapped_column(String(255), nullable=True)
     registration_date: Mapped[datetime] = mapped_column(
@@ -38,18 +40,21 @@ class User(Base):
         default=lambda: datetime.now(timezone.utc),
     )
 
-    # ── Relationships ─────────────────────────────────────────
+    # в”Ђв”Ђ Relationships в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
     bundle: Mapped["PublicBundle | None"] = relationship(
-        back_populates="user", uselist=False, cascade="all, delete-orphan",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
     )
     one_time_keys: Mapped[list["OneTimeKey"]] = relationship(
-        back_populates="user", cascade="all, delete-orphan",
+        back_populates="user",
+        cascade="all, delete-orphan",
     )
 
 
 class PublicBundle(Base):
     """
-    X3DH public bundle for a user — identity key, signed pre-key, and
+    X3DH public bundle for a user вЂ” identity key, signed pre-key, and
     the signature proving the signed pre-key belongs to the identity.
 
     One row per user.  Replaced when the user rotates their signed pre-key.
@@ -59,14 +64,16 @@ class PublicBundle(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("users.telegram_id", ondelete="CASCADE"),
-        unique=True, index=True,
+        BigInteger,
+        ForeignKey("users.telegram_id", ondelete="CASCADE"),
+        unique=True,
+        index=True,
     )
     identity_key: Mapped[str] = mapped_column(Text, nullable=False)
     signed_pre_key: Mapped[str] = mapped_column(Text, nullable=False)
     signature: Mapped[str] = mapped_column(Text, nullable=False)
 
-    # ── Relationships ─────────────────────────────────────────
+    # в”Ђв”Ђ Relationships в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
     user: Mapped["User"] = relationship(back_populates="bundle")
 
 
@@ -82,13 +89,14 @@ class OneTimeKey(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("users.telegram_id", ondelete="CASCADE"),
+        BigInteger,
+        ForeignKey("users.telegram_id", ondelete="CASCADE"),
         index=True,
     )
     key_id: Mapped[str] = mapped_column(String(255), nullable=False)
     public_key: Mapped[str] = mapped_column(Text, nullable=False)
 
-    # ── Relationships ─────────────────────────────────────────
+    # в”Ђв”Ђ Relationships в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
     user: Mapped["User"] = relationship(back_populates="one_time_keys")
 
 
@@ -96,7 +104,7 @@ class Message(Base):
     """
     An encrypted message blob sitting in a recipient's inbox.
 
-    The server never inspects `encrypted_payload` — it's opaque ciphertext
+    The server never inspects `encrypted_payload` вЂ” it's opaque ciphertext
     produced by `trustgram-crypto` on the sender's device.
     """
 
@@ -104,7 +112,8 @@ class Message(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     recipient_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("users.telegram_id", ondelete="CASCADE"),
+        BigInteger,
+        ForeignKey("users.telegram_id", ondelete="CASCADE"),
         index=True,
     )
     sender_id: Mapped[int] = mapped_column(BigInteger, nullable=False)

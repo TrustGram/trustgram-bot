@@ -11,7 +11,6 @@ Reference: https://core.telegram.org/bots/webapps#validating-data-received-via-t
 import hashlib
 import hmac
 import json
-from datetime import datetime, timezone
 from urllib.parse import parse_qs
 
 from fastapi import Header, HTTPException, status
@@ -43,19 +42,13 @@ def _validate_init_data(init_data: str) -> dict:
         )
 
     # Build the check-string: sorted key=value pairs joined by newlines.
-    data_check_parts = sorted(
-        f"{k}={v[0]}" for k, v in parsed.items()
-    )
+    data_check_parts = sorted(f"{k}={v[0]}" for k, v in parsed.items())
     data_check_string = "\n".join(data_check_parts)
 
     # Two-stage HMAC per Telegram specification.
-    secret_key = hmac.new(
-        b"WebAppData", settings.bot_token.encode(), hashlib.sha256
-    ).digest()
+    secret_key = hmac.new(b"WebAppData", settings.bot_token.encode(), hashlib.sha256).digest()
 
-    computed_hash = hmac.new(
-        secret_key, data_check_string.encode(), hashlib.sha256
-    ).hexdigest()
+    computed_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
 
     if not hmac.compare_digest(computed_hash, received_hash):
         raise HTTPException(

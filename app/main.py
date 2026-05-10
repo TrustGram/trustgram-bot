@@ -2,44 +2,45 @@
 TrustGram — FastAPI application entry point.
 
 Wires together:
-  • Database lifecycle (create tables on startup)
   • API v1 routers  (keys + chat)
   • Telegram webhook endpoint
   • aiogram bot lifecycle
 
+Schema migrations are managed by Alembic and run automatically
+before the server starts (see Dockerfile / render.yaml).
+
 Start locally with:
-    uvicorn app.main:app --reload
+    alembic upgrade head && uvicorn app.main:app --reload
 """
 
 from contextlib import asynccontextmanager
-
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
-from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
+from pathlib import Path
 
 from aiogram import types as aio_types
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 
 from app.api.v1.router import router as api_v1_router
 from app.bot.bot import bot, dp, on_shutdown, on_startup
 from app.core.config import settings
-from app.core.database import init_db
-from app.core.logger import setup_logging, logger
+from app.core.logger import logger, setup_logging
 
 # Initialize logging as early as possible
 setup_logging()
 
+# ── Version ───────────────────────────────────────────────────
+
+_VERSION_FILE = Path(__file__).resolve().parent.parent / "VERSION"
+__version__ = _VERSION_FILE.read_text(encoding="utf-8").strip() if _VERSION_FILE.exists() else "0.0.0-dev"
+
 
 # ── Lifespan ──────────────────────────────────────────────────
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Modern lifespan handler (replaces deprecated on_event)."""
     logger.info("Application starting up...")
-    try:
-        await init_db()
-        logger.info("Database initialized successfully.")
-    except Exception as e:
-        logger.error(f"Failed to initialize database: {e}")
-        raise
 
     await on_startup()
     logger.info("Bot startup tasks completed.")
@@ -53,7 +54,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.project_name,
-    version="0.1.0",
+    version=__version__,
     description=(
         "Zero-trust key server and encrypted message relay for TrustGram. "
         "All encryption happens client-side; the server never sees plaintext."
@@ -68,11 +69,12 @@ app = FastAPI(
 
 # ── Health check ──────────────────────────────────────────────
 
+
 @app.get("/health", tags=["meta"])
 async def health_check():
     """Simple liveness probe for Render / load-balancer."""
     logger.debug("Health check requested")
-    return {"status": "ok", "service": settings.project_name}
+    return {"status": "ok", "service": settings.project_name, "version": __version__}
 
 
 # ── API v1 ────────────────────────────────────────────────────
@@ -81,6 +83,7 @@ app.include_router(api_v1_router, prefix=settings.api_v1_prefix)
 
 
 # ── Telegram webhook ─────────────────────────────────────────
+
 
 @app.post("/webhook", include_in_schema=False)
 async def telegram_webhook(request: Request):
@@ -95,6 +98,7 @@ async def telegram_webhook(request: Request):
 
 
 # ── Docs access control ───────────────────────────────────────
+
 
 def _require_docs_access(
     x_docs_key: str | None = Header(default=None),

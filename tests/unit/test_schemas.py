@@ -8,6 +8,8 @@ Covers
 - Default values behave as specified.
 """
 
+from datetime import datetime, timezone
+
 import pytest
 from pydantic import ValidationError
 
@@ -21,10 +23,9 @@ from app.schemas.schemas import (
     SendMessageRequest,
     StatusResponse,
 )
-from datetime import datetime, timezone
-
 
 # ── OneTimeKeySchema ─────────────────────────────────────────────────────────
+
 
 class TestOneTimeKeySchema:
     def test_valid(self):
@@ -42,6 +43,7 @@ class TestOneTimeKeySchema:
 
 
 # ── RegisterBundleRequest ────────────────────────────────────────────────────
+
 
 class TestRegisterBundleRequest:
     def test_valid_with_otks(self):
@@ -68,6 +70,7 @@ class TestRegisterBundleRequest:
 
 # ── PublicBundleResponse ─────────────────────────────────────────────────────
 
+
 class TestPublicBundleResponse:
     def test_valid_with_otk(self):
         resp = PublicBundleResponse(
@@ -92,11 +95,10 @@ class TestPublicBundleResponse:
 
 # ── RefillOTKRequest ─────────────────────────────────────────────────────────
 
+
 class TestRefillOTKRequest:
     def test_valid(self):
-        req = RefillOTKRequest(
-            one_time_keys=[{"key_id": "1", "public_key": "pk"}]
-        )
+        req = RefillOTKRequest(one_time_keys=[{"key_id": "1", "public_key": "pk"}])
         assert len(req.one_time_keys) == 1
 
     def test_empty_list_rejected(self):
@@ -111,6 +113,7 @@ class TestRefillOTKRequest:
 
 # ── SendMessageRequest ───────────────────────────────────────────────────────
 
+
 class TestSendMessageRequest:
     def test_valid(self):
         req = SendMessageRequest(recipient_id=999, encrypted_payload="blob")
@@ -122,6 +125,7 @@ class TestSendMessageRequest:
 
 
 # ── MessageResponse ──────────────────────────────────────────────────────────
+
 
 class TestMessageResponse:
     def test_valid(self):
@@ -138,6 +142,7 @@ class TestMessageResponse:
 
 # ── InboxResponse ────────────────────────────────────────────────────────────
 
+
 class TestInboxResponse:
     def test_empty_inbox(self):
         resp = InboxResponse(messages=[])
@@ -145,15 +150,12 @@ class TestInboxResponse:
 
     def test_with_messages(self):
         now = datetime.now(timezone.utc)
-        resp = InboxResponse(
-            messages=[
-                {"id": 1, "sender_id": 2, "encrypted_payload": "x", "timestamp": now}
-            ]
-        )
+        resp = InboxResponse(messages=[{"id": 1, "sender_id": 2, "encrypted_payload": "x", "timestamp": now}])
         assert len(resp.messages) == 1
 
 
 # ── StatusResponse ───────────────────────────────────────────────────────────
+
 
 class TestStatusResponse:
     def test_defaults(self):

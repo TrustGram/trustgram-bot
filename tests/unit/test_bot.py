@@ -8,8 +8,9 @@ Covers
 - on_shutdown: calls bot.session.close.
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 
 class TestFallbackHandler:
@@ -46,7 +47,7 @@ class TestOnStartup:
     async def test_on_startup_handles_exception_gracefully(self):
         """on_startup should catch exceptions during menu button setup and log a warning."""
         from app.bot import bot as bot_module
-        
+
         mock_bot = MagicMock()
         mock_bot.set_chat_menu_button = AsyncMock(side_effect=Exception("API Error"))
 

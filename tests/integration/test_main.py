@@ -5,11 +5,13 @@ Covers
 ------
 - GET  /health       → 200 {"status": "ok", ...}
 - POST /webhook      → 200 {"ok": True} (aiogram dispatcher is mocked)
+- Lifespan hooks     → on_startup / on_shutdown are called correctly
 """
+
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import AsyncClient
-from unittest.mock import AsyncMock, patch
 
 
 class TestHealthEndpoint:
@@ -20,44 +22,30 @@ class TestHealthEndpoint:
         data = response.json()
         assert data["status"] == "ok"
         assert "service" in data
+        assert "version" in data
 
 
 class TestLifespan:
     @pytest.mark.asyncio
-    async def test_lifespan_calls_init_db_and_bot_hooks(self):
+    async def test_lifespan_calls_bot_hooks(self):
         """
-        The lifespan async context manager must call init_db(), on_startup()
+        The lifespan async context manager must call on_startup()
         on enter, and on_shutdown() on exit.
+
+        Note: init_db() was removed — migrations are handled by Alembic
+        before the server starts.
         """
-        from unittest.mock import AsyncMock, patch
         from app.main import lifespan
 
         with (
-            patch("app.main.init_db", new_callable=AsyncMock) as mock_init_db,
             patch("app.main.on_startup", new_callable=AsyncMock) as mock_startup,
             patch("app.main.on_shutdown", new_callable=AsyncMock) as mock_shutdown,
         ):
             async with lifespan(None):
-                mock_init_db.assert_called_once()
                 mock_startup.assert_called_once()
                 mock_shutdown.assert_not_called()
 
             mock_shutdown.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_lifespan_init_db_failure_raises_exception(self):
-        """If init_db fails, the lifespan should log the error and re-raise it."""
-        from app.main import lifespan
-        
-        with (
-            patch("app.main.init_db", side_effect=Exception("DB Connection Failed")),
-            patch("app.main.logger.error") as mock_log_error
-        ):
-            with pytest.raises(Exception, match="DB Connection Failed"):
-                async with lifespan(None):
-                    pass
-            
-            mock_log_error.assert_called_once()
 
 
 class TestWebhookEndpoint:

@@ -41,11 +41,13 @@ async def send_message(
     """
     sender_id: int = user["id"]
 
-    db.add(Message(
-        recipient_id=body.recipient_id,
-        sender_id=sender_id,
-        encrypted_payload=body.encrypted_payload,
-    ))
+    db.add(
+        Message(
+            recipient_id=body.recipient_id,
+            sender_id=sender_id,
+            encrypted_payload=body.encrypted_payload,
+        )
+    )
 
     logger.info(f"Message relay: {sender_id} -> {body.recipient_id}")
     # TODO: send Telegram notification to recipient via aiogram bot instance.
@@ -69,11 +71,7 @@ async def get_inbox(
     """
     telegram_id: int = user["id"]
 
-    stmt = (
-        select(Message)
-        .where(Message.recipient_id == telegram_id)
-        .order_by(Message.timestamp.asc())
-    )
+    stmt = select(Message).where(Message.recipient_id == telegram_id).order_by(Message.timestamp.asc())
     result = await db.execute(stmt)
     messages = result.scalars().all()
 
@@ -114,9 +112,11 @@ async def delete_message(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Message not found",
         )
-    
+
     if msg.recipient_id != telegram_id:
-        logger.error(f"Unauthorized delete attempt: User {telegram_id} tried to delete message {message_id} belonging to {msg.recipient_id}")
+        logger.error(
+            f"Unauthorized delete attempt: User {telegram_id} tried to delete message {message_id} belonging to {msg.recipient_id}"
+        )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Message not found",

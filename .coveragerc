@@ -1,6 +1,8 @@
 [run]
 source = app
 concurrency = thread,greenlet
+omit =
+    alembic/*
 
 [report]
 exclude_lines =

@@ -42,6 +42,9 @@ coverage.xml
 .DS_Store
 Thumbs.db
 
-# -- Logs ------------------------------------------------------
+# ── Logs ─────────────────────────────────────────────────────
 logs/
 *.log
+
+# ── Docker (local overrides) ─────────────────────────────────
+docker-compose.override.yml

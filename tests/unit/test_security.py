@@ -15,15 +15,15 @@ import hashlib
 import hmac
 import json
 import urllib.parse
+from unittest.mock import patch
 
 import pytest
 from fastapi import HTTPException
-from unittest.mock import patch
 
 from app.core.security import _validate_init_data, get_current_user
 
-
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
 
 def _build_valid_init_data(bot_token: str, user_payload: dict) -> str:
     """Build a correctly HMAC-signed initData string matching Telegram's spec."""
@@ -38,12 +38,8 @@ def _build_valid_init_data(bot_token: str, user_payload: dict) -> str:
     data_check_string = "\n".join(data_check_parts)
 
     # Compute the HMAC.
-    secret_key = hmac.new(
-        b"WebAppData", bot_token.encode(), hashlib.sha256
-    ).digest()
-    hash_value = hmac.new(
-        secret_key, data_check_string.encode(), hashlib.sha256
-    ).hexdigest()
+    secret_key = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
+    hash_value = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
 
     params["hash"] = hash_value
     return urllib.parse.urlencode(params)
@@ -54,6 +50,7 @@ FAKE_USER = {"id": 42, "first_name": "Alice", "username": "alice"}
 
 
 # ── _validate_init_data ───────────────────────────────────────────────────────
+
 
 class TestValidateInitData:
     def test_valid_signature_returns_user(self):
@@ -75,9 +72,7 @@ class TestValidateInitData:
     def test_invalid_hash_raises_403(self):
         init_data = _build_valid_init_data(FAKE_TOKEN, FAKE_USER)
         # Tamper the hash
-        tampered = init_data.replace(
-            "hash=", "hash=00000000"
-        )
+        tampered = init_data.replace("hash=", "hash=00000000")
         with patch("app.core.security.settings") as mock_settings:
             mock_settings.bot_token = FAKE_TOKEN
             with pytest.raises(HTTPException) as exc:
@@ -90,12 +85,8 @@ class TestValidateInitData:
         params = {"auth_date": "1700000000"}
         data_check_parts = sorted(f"{k}={v}" for k, v in params.items())
         data_check_string = "\n".join(data_check_parts)
-        secret_key = hmac.new(
-            b"WebAppData", FAKE_TOKEN.encode(), hashlib.sha256
-        ).digest()
-        hash_value = hmac.new(
-            secret_key, data_check_string.encode(), hashlib.sha256
-        ).hexdigest()
+        secret_key = hmac.new(b"WebAppData", FAKE_TOKEN.encode(), hashlib.sha256).digest()
+        hash_value = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
         params["hash"] = hash_value
         init_data = urllib.parse.urlencode(params)
 
@@ -108,6 +99,7 @@ class TestValidateInitData:
 
 
 # ── get_current_user ──────────────────────────────────────────────────────────
+
 
 class TestGetCurrentUser:
     @pytest.mark.asyncio
