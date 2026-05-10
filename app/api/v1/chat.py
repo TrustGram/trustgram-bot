@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.logger import logger
 from app.core.security import get_current_user
 from app.models.models import Message
 from app.schemas.schemas import (
@@ -46,6 +47,7 @@ async def send_message(
         encrypted_payload=body.encrypted_payload,
     ))
 
+    logger.info(f"Message relay: {sender_id} -> {body.recipient_id}")
     # TODO: send Telegram notification to recipient via aiogram bot instance.
 
     return StatusResponse(detail="Message delivered to inbox")
@@ -75,6 +77,7 @@ async def get_inbox(
     result = await db.execute(stmt)
     messages = result.scalars().all()
 
+    logger.debug(f"User {telegram_id} fetched inbox: {len(messages)} messages")
     return InboxResponse(
         messages=[
             MessageResponse(
@@ -105,11 +108,20 @@ async def delete_message(
     telegram_id: int = user["id"]
 
     msg = await db.get(Message, message_id)
-    if not msg or msg.recipient_id != telegram_id:
+    if not msg:
+        logger.warning(f"Delete requested for non-existent message: {message_id}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Message not found",
+        )
+    
+    if msg.recipient_id != telegram_id:
+        logger.error(f"Unauthorized delete attempt: User {telegram_id} tried to delete message {message_id} belonging to {msg.recipient_id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Message not found",
         )
 
     await db.delete(msg)
+    logger.info(f"Message {message_id} acknowledged and deleted by {telegram_id}")
     return StatusResponse(detail="Message deleted")

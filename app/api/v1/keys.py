@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.logger import logger
 from app.core.security import get_current_user
 from app.models.models import OneTimeKey, PublicBundle, User
 from app.schemas.schemas import (
@@ -46,10 +47,13 @@ async def register_bundle(
     # Upsert user row.
     existing_user = await db.get(User, telegram_id)
     if not existing_user:
+        logger.info(f"New user registration: {telegram_id}")
         db.add(User(
             telegram_id=telegram_id,
             username=user.get("username"),
         ))
+    else:
+        logger.debug(f"Updating keys for existing user: {telegram_id}")
 
     # Upsert public bundle.
     stmt = select(PublicBundle).where(PublicBundle.user_id == telegram_id)
@@ -75,7 +79,8 @@ async def register_bundle(
             key_id=otk.key_id,
             public_key=otk.public_key,
         ))
-
+    
+    logger.info(f"Bundle registered for {telegram_id} with {len(body.one_time_keys)} OTKs")
     return StatusResponse(detail="Bundle registered")
 
 
@@ -100,6 +105,7 @@ async def get_bundle(
     bundle = result.scalar_one_or_none()
 
     if not bundle:
+        logger.warning(f"Key bundle requested for unknown user: {telegram_id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User has no registered bundle",
@@ -116,8 +122,11 @@ async def get_bundle(
 
     otk_out: OneTimeKeySchema | None = None
     if otk:
+        logger.debug(f"Consuming OTK {otk.key_id} for user {telegram_id}")
         otk_out = OneTimeKeySchema(key_id=otk.key_id, public_key=otk.public_key)
         await db.delete(otk)
+    else:
+        logger.warning(f"User {telegram_id} has exhausted all One-Time Keys!")
 
     return PublicBundleResponse(
         telegram_id=telegram_id,
@@ -151,4 +160,5 @@ async def refill_otk(
             public_key=otk.public_key,
         ))
 
+    logger.info(f"User {telegram_id} refilled {len(body.one_time_keys)} OTKs")
     return StatusResponse(detail=f"Added {len(body.one_time_keys)} one-time keys")

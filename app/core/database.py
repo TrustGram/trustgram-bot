@@ -13,7 +13,9 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.orm import DeclarativeBase
 
 from app.core.config import settings
+from app.core.logger import logger
 
+logger.info(f"Connecting to database at: {settings.database_url}")
 engine = create_async_engine(
     settings.database_url,
     echo=settings.debug,
@@ -40,10 +42,14 @@ async def init_db() -> None:
 
 async def get_db() -> AsyncSession:  # type: ignore[misc]
     """FastAPI dependency — yields a transactional session."""
+    logger.debug("Opening new database session")
     async with async_session_factory() as session:
         try:
             yield session  # type: ignore[misc]
             await session.commit()
-        except Exception:
+            logger.debug("Database session committed")
+        except Exception as e:
+            logger.error(f"Database session error: {e}")
             await session.rollback()
+            logger.info("Database session rolled back")
             raise

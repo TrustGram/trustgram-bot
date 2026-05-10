@@ -26,6 +26,13 @@ class Settings(BaseSettings):
     # ── API ───────────────────────────────────────────────────
     api_v1_prefix: str = "/api/v1"
     project_name: str = "TrustGram"
+    # ── Logging ───────────────────────────────────────────────
+    log_level: str = "INFO"
+    log_format: str = "%(asctime)s | %(levelname)-8s | %(name)s:%(funcName)s:%(lineno)d - %(message)s"
+    log_file_path: str = "logs/trustgram.log"
+    log_to_file: bool = True
+    log_to_console: bool = True
+
     debug: bool = False
 
 

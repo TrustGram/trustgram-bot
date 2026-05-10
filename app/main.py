@@ -21,6 +21,10 @@ from app.api.v1.router import router as api_v1_router
 from app.bot.bot import bot, dp, on_shutdown, on_startup
 from app.core.config import settings
 from app.core.database import init_db
+from app.core.logger import setup_logging, logger
+
+# Initialize logging as early as possible
+setup_logging()
 
 
 # ── Lifespan ──────────────────────────────────────────────────
@@ -28,10 +32,20 @@ from app.core.database import init_db
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Modern lifespan handler (replaces deprecated on_event)."""
-    await init_db()
+    logger.info("Application starting up...")
+    try:
+        await init_db()
+        logger.info("Database initialized successfully.")
+    except Exception as e:
+        logger.error(f"Failed to initialize database: {e}")
+        raise
+
     await on_startup()
+    logger.info("Bot startup tasks completed.")
     yield
+    logger.info("Application shutting down...")
     await on_shutdown()
+    logger.info("Shutdown sequence complete.")
 
 
 # ── Application ───────────────────────────────────────────────
@@ -52,6 +66,7 @@ app = FastAPI(
 @app.get("/health", tags=["meta"])
 async def health_check():
     """Simple liveness probe for Render / load-balancer."""
+    logger.debug("Health check requested")
     return {"status": "ok", "service": settings.project_name}
 
 
