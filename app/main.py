@@ -13,7 +13,8 @@ Start locally with:
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 
 from aiogram import types as aio_types
 
@@ -58,6 +59,10 @@ app = FastAPI(
         "All encryption happens client-side; the server never sees plaintext."
     ),
     lifespan=lifespan,
+    # Disable default doc routes — re-exposed with access control below.
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
 )
 
 
@@ -87,3 +92,46 @@ async def telegram_webhook(request: Request):
     update = aio_types.Update(**data)
     await dp.feed_update(bot, update)
     return {"ok": True}
+
+
+# ── Docs access control ───────────────────────────────────────
+
+def _require_docs_access(
+    x_docs_key: str | None = Header(default=None),
+) -> None:
+    """
+    Dependency that gates /docs, /redoc, and /openapi.json.
+
+    Behaviour by environment:
+      - development : no key required — always allowed.
+      - production  : ``X-Docs-Key`` header must match ``DOCS_API_KEY``.
+                      Returns 404 (not 401) so the path looks non-existent
+                      to automated scanners.
+    """
+    if settings.environment == "production":
+        if not settings.docs_api_key or x_docs_key != settings.docs_api_key:
+            raise HTTPException(status_code=404, detail="Not found")
+
+
+@app.get("/docs", include_in_schema=False, dependencies=[Depends(_require_docs_access)])
+async def swagger_ui():
+    """Swagger UI — requires ``X-Docs-Key`` header in production."""
+    return get_swagger_ui_html(
+        openapi_url="/openapi.json",
+        title=f"{settings.project_name} — Swagger UI",
+    )
+
+
+@app.get("/redoc", include_in_schema=False, dependencies=[Depends(_require_docs_access)])
+async def redoc_ui():
+    """ReDoc — requires ``X-Docs-Key`` header in production."""
+    return get_redoc_html(
+        openapi_url="/openapi.json",
+        title=f"{settings.project_name} — ReDoc",
+    )
+
+
+@app.get("/openapi.json", include_in_schema=False, dependencies=[Depends(_require_docs_access)])
+async def openapi_schema():
+    """Raw OpenAPI schema — requires ``X-Docs-Key`` header in production."""
+    return app.openapi()
