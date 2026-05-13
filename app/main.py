@@ -21,7 +21,7 @@ from aiogram import types as aio_types
 from app.api.v1.router import router as api_v1_router
 from app.bot.bot import bot, dp, on_shutdown, on_startup
 from app.core.config import settings
-from app.core.database import init_db
+from app.core.database import init_db, engine, Base
 
 
 # ── Lifespan ──────────────────────────────────────────────────
@@ -67,6 +67,18 @@ async def health_check():
 # ── API v1 ────────────────────────────────────────────────────
 
 app.include_router(api_v1_router, prefix=settings.api_v1_prefix)
+
+
+# ── Dev-only reset ───────────────────────────────────────────
+
+if settings.debug:
+    @app.post("/dev/reset-db", tags=["dev"], include_in_schema=True)
+    async def reset_db():
+        """Drop and recreate all tables. DEBUG mode only."""
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+            await conn.run_sync(Base.metadata.create_all)
+        return {"ok": True, "detail": "Database reset"}
 
 
 # ── Telegram webhook ─────────────────────────────────────────
