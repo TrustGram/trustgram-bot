@@ -49,7 +49,8 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "https://trustgram-ui.pages.dev", "https://trustgram-ui.stacksurfer.workers.dev"],
+    allow_origins=["http://localhost:5173", "https://trustgram-ui.pages.dev", "https://trustgram-ui.stacksurfer.workers.dev", "https://991b4475.trustgram-ui.pages.dev"],
+    allow_origin_regex=r"https://.*\.trustgram-ui\.pages\.dev",
     allow_methods=["*"],
     allow_headers=["*"],
 )
