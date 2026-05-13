@@ -10,9 +10,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.bot.bot import bot
 from app.core.database import get_db
 from app.core.security import get_current_user
-from app.models.models import Message
+from app.core.config import settings
+from app.models.models import Message, User
 from app.schemas.schemas import (
     InboxResponse,
     MessageResponse,
@@ -45,8 +47,22 @@ async def send_message(
         sender_id=sender_id,
         encrypted_payload=body.encrypted_payload,
     ))
+    await db.flush()
 
-    # TODO: send Telegram notification to recipient via aiogram bot instance.
+    # Send Telegram notification to recipient
+    sender = await db.get(User, sender_id)
+    sender_name = f"@{sender.username}" if sender and sender.username else str(sender_id)
+
+    try:
+        await bot.send_message(
+            chat_id=body.recipient_id,
+            text=(
+                f"🔒 New encrypted message from {sender_name}\n\n"
+                f"Open TrustGram to read it."
+            ),
+        )
+    except Exception:
+        pass  # recipient may not have started the bot — don't fail the send
 
     return StatusResponse(detail="Message delivered to inbox")
 
