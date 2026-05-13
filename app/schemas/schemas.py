@@ -56,6 +56,7 @@ class MessageResponse(BaseModel):
     """A single encrypted message returned from the inbox."""
     id: int
     sender_id: int
+    sender_username: str | None = None
     encrypted_payload: str
     timestamp: datetime
 

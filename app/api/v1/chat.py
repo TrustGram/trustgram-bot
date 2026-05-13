@@ -84,22 +84,24 @@ async def get_inbox(
     telegram_id: int = user["id"]
 
     stmt = (
-        select(Message)
+        select(Message, User.username)
+        .outerjoin(User, Message.sender_id == User.telegram_id)
         .where(Message.recipient_id == telegram_id)
         .order_by(Message.timestamp.asc())
     )
     result = await db.execute(stmt)
-    messages = result.scalars().all()
+    rows = result.all()
 
     return InboxResponse(
         messages=[
             MessageResponse(
                 id=m.id,
                 sender_id=m.sender_id,
+                sender_username=username,
                 encrypted_payload=m.encrypted_payload,
                 timestamp=m.timestamp,
             )
-            for m in messages
+            for m, username in rows
         ]
     )
 
