@@ -23,7 +23,8 @@ Its primary role is to act as a **Zero-Trust Key Server and Message Relay**. It 
 ### 🔑 Key Management
 
 - `POST /api/v1/keys/register`: Initial upload of the public bundle.
-- `GET /api/v1/keys/{telegram_id}`: Fetch Bob's bundle to start an X3DH session.
+- `GET /api/v1/keys/{telegram_id}`: Fetch a user's bundle by Telegram ID.
+- `GET /api/v1/keys/by-username/{username}`: Fetch a user's bundle by username (case-insensitive, `@` prefix optional).
 - `POST /api/v1/keys/otk`: Refill one-time pre-keys when they run low.
 
 ### ✉️ Messaging
@@ -101,7 +102,7 @@ DATABASE_URL=sqlite+aiosqlite:///./trustgram.db
 | `BOT_TOKEN` | ✅ | Telegram bot token from @BotFather |
 | `WEBAPP_URL` | ✅ | Public URL of the TrustGram Mini App |
 | `DATABASE_URL` | ❌ | Defaults to local SQLite file (`trustgram.db`) |
-| `DEBUG` | ❌ | Set to `true` to enable SQL query logging |
+| `DEBUG` | ❌ | Set to `true` to skip `initData` validation and use mock user ID `12345678` |
 
 ### 5. Run the server
 
@@ -155,8 +156,17 @@ BOT_TOKEN="mock_token" pytest tests -v
 $env:BOT_TOKEN="mock_token"; pytest tests -v
 ```
 
+## CORS
+
+The server allows cross-origin requests from:
+- `http://localhost:5173` — local Vite dev server
+- `https://trustgram-ui.pages.dev` — Cloudflare Pages production
+- `https://*.trustgram-ui.pages.dev` — Cloudflare Pages preview deployments
+
+Add origins in `app/main.py` when deploying to a custom domain.
+
 ## Security Design
 
 - **No Plaintext**: The server never receives unencrypted message content.
-- **Rate Limiting**: Protection against spam and key-exhaustion attacks.
-- **Telegram Validation**: Every API request is validated using `initData` hash from Telegram WebApp.
+- **Telegram Validation**: Every API request is validated using `initData` HMAC signed by Telegram. Set `DEBUG=false` in production.
+- **Zero-Trust**: Private keys never leave the client — the server only stores opaque ciphertext and public key material.
