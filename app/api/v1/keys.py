@@ -46,9 +46,10 @@ async def register_bundle(
     # Upsert user row.
     existing_user = await db.get(User, telegram_id)
     if not existing_user:
+        raw_username = user.get("username")
         db.add(User(
             telegram_id=telegram_id,
-            username=user.get("username"),
+            username=raw_username.lower() if raw_username else None,
         ))
 
     # Upsert public bundle.
@@ -77,6 +78,30 @@ async def register_bundle(
         ))
 
     return StatusResponse(detail="Bundle registered")
+
+
+@router.get(
+    "/by-username/{username}",
+    response_model=PublicBundleResponse,
+    summary="Fetch a user's public bundle by username",
+)
+async def get_bundle_by_username(
+    username: str,
+    _user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    username = username.lstrip("@").lower()
+    stmt = select(User).where(User.username == username)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    return await get_bundle(user.telegram_id, _user, db)
 
 
 @router.get(
