@@ -14,6 +14,7 @@ Start locally with:
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 
 from aiogram import types as aio_types
 
@@ -44,6 +45,13 @@ app = FastAPI(
         "All encryption happens client-side; the server never sees plaintext."
     ),
     lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "https://trustgram-ui.pages.dev", "https://trustgram-ui.stacksurfer.workers.dev"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
