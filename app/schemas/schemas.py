@@ -67,6 +67,32 @@ class InboxResponse(BaseModel):
 
 
 # ═══════════════════════════════════════════════════════════════
+# Session Requests
+# ═══════════════════════════════════════════════════════════════
+
+class SessionInitRequest(BaseModel):
+    """POST /session/init — send a chat request to another user."""
+    to_id: int
+
+
+class SessionRespondRequest(BaseModel):
+    """POST /session/accept or /session/decline — respond to a request."""
+    from_id: int
+
+
+class SessionPendingItem(BaseModel):
+    """A single pending incoming session request."""
+    from_id: int
+    from_username: str | None = None
+    created_at: datetime
+
+
+class PendingSessionsResponse(BaseModel):
+    """GET /session/pending — all pending requests for current user."""
+    requests: list[SessionPendingItem]
+
+
+# ═══════════════════════════════════════════════════════════════
 # Generic
 # ═══════════════════════════════════════════════════════════════
 

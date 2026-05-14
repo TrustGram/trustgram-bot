@@ -6,6 +6,7 @@ Schema mirrors the README spec:
   - PublicBundles    — X3DH identity + signed pre-key per user.
   - OneTimeKeys     — Expendable one-time pre-keys (consumed on first use).
   - Messages        — Store-and-forward encrypted blobs (the "inbox").
+  - SessionRequests — Pending chat initiation requests.
 """
 
 from datetime import datetime, timezone
@@ -110,6 +111,28 @@ class Message(Base):
     sender_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     encrypted_payload: Mapped[str] = mapped_column(Text, nullable=False)
     timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+
+class SessionRequest(Base):
+    """
+    Pending chat initiation request.
+
+    Alice calls POST /session/init to create one; Bob sees it via
+    GET /session/pending and can accept or decline.
+    """
+
+    __tablename__ = "session_requests"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    from_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    to_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.telegram_id", ondelete="CASCADE"), index=True,
+    )
+    from_username: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
     )
