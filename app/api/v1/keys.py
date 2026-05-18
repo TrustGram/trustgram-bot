@@ -7,7 +7,7 @@ POST /keys/otk        — refill one-time pre-keys.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -75,7 +75,10 @@ async def register_bundle(
             )
         )
 
-    # Store one-time pre-keys.
+    # Replace OTKs: old keys are invalid after bundle rotation.
+    await db.execute(delete(OneTimeKey).where(OneTimeKey.user_id == telegram_id))
+
+    # Store new one-time pre-keys.
     for otk in body.one_time_keys:
         db.add(
             OneTimeKey(
