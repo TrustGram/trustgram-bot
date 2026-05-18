@@ -24,6 +24,7 @@ from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from app.api.v1.router import router as api_v1_router
 from app.bot.bot import bot, dp, on_shutdown, on_startup
 from app.core.config import settings
+from app.core.database import Base, engine
 from app.core.logger import logger, setup_logging
 
 # Initialize logging as early as possible
@@ -42,6 +43,10 @@ __version__ = _VERSION_FILE.read_text(encoding="utf-8").strip() if _VERSION_FILE
 async def lifespan(app: FastAPI):
     """Modern lifespan handler (replaces deprecated on_event)."""
     logger.info("Application starting up...")
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    logger.info("Database schema ensured.")
 
     await on_startup()
     logger.info("Bot startup tasks completed.")
