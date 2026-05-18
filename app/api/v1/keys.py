@@ -49,10 +49,12 @@ async def register_bundle(
     if not existing_user:
         logger.info(f"New user registration: {telegram_id}")
         raw_username = user.get("username")
-        db.add(User(
-            telegram_id=telegram_id,
-            username=raw_username.lower() if raw_username else None,
-        ))
+        db.add(
+            User(
+                telegram_id=telegram_id,
+                username=raw_username.lower() if raw_username else None,
+            )
+        )
     else:
         logger.debug(f"Updating keys for existing user: {telegram_id}")
 

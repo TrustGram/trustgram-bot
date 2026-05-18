@@ -42,11 +42,13 @@ async def send_message(
     """
     sender_id: int = user["id"]
 
-    db.add(Message(
-        recipient_id=body.recipient_id,
-        sender_id=sender_id,
-        encrypted_payload=body.encrypted_payload,
-    ))
+    db.add(
+        Message(
+            recipient_id=body.recipient_id,
+            sender_id=sender_id,
+            encrypted_payload=body.encrypted_payload,
+        )
+    )
     await db.flush()
 
     sender = await db.get(User, sender_id)

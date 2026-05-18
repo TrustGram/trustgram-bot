@@ -28,9 +28,7 @@ class User(Base):
     bundle: Mapped["PublicBundle | None"] = relationship(
         back_populates="user", uselist=False, cascade="all, delete-orphan"
     )
-    one_time_keys: Mapped[list["OneTimeKey"]] = relationship(
-        back_populates="user", cascade="all, delete-orphan"
-    )
+    one_time_keys: Mapped[list["OneTimeKey"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class PublicBundle(Base):
@@ -51,9 +49,7 @@ class OneTimeKey(Base):
     __tablename__ = "one_time_keys"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("users.telegram_id", ondelete="CASCADE"), index=True
-    )
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.telegram_id", ondelete="CASCADE"), index=True)
     key_id: Mapped[str] = mapped_column(String(255), nullable=False)
     public_key: Mapped[str] = mapped_column(Text, nullable=False)
 
