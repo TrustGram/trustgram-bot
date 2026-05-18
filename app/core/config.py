@@ -40,6 +40,14 @@ class Settings(BaseSettings):
     log_to_file: bool = True
     log_to_console: bool = True
 
+    # ── CORS ──────────────────────────────────────────────────
+    cors_origins: list[str] = [
+        "http://localhost:5173",
+        "https://trustgram-ui.pages.dev",
+        "https://trustgram-ui.stacksurfer.workers.dev",
+    ]
+    cors_origin_regex: str = r"https://.*\.trustgram-ui\.pages\.dev"
+
     # ── Docs access ───────────────────────────────────────────
     environment: str = "development"  # "development" | "production"
     docs_api_key: str | None = None  # required to access /docs on prod

@@ -63,6 +63,7 @@ class MessageResponse(BaseModel):
 
     id: int
     sender_id: int
+    sender_username: str | None = None
     encrypted_payload: str
     timestamp: datetime
 

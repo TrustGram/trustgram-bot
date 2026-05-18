@@ -48,12 +48,11 @@ async def register_bundle(
     existing_user = await db.get(User, telegram_id)
     if not existing_user:
         logger.info(f"New user registration: {telegram_id}")
-        db.add(
-            User(
-                telegram_id=telegram_id,
-                username=user.get("username"),
-            )
-        )
+        raw_username = user.get("username")
+        db.add(User(
+            telegram_id=telegram_id,
+            username=raw_username.lower() if raw_username else None,
+        ))
     else:
         logger.debug(f"Updating keys for existing user: {telegram_id}")
 
@@ -88,6 +87,28 @@ async def register_bundle(
 
     logger.info(f"Bundle registered for {telegram_id} with {len(body.one_time_keys)} OTKs")
     return StatusResponse(detail="Bundle registered")
+
+
+@router.get(
+    "/by-username/{username}",
+    response_model=PublicBundleResponse,
+    summary="Fetch a user's public bundle by username",
+)
+async def get_bundle_by_username(
+    username: str,
+    _user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    username = username.lstrip("@").lower()
+    stmt = select(User).where(User.username == username)
+    result = await db.execute(stmt)
+    found_user = result.scalar_one_or_none()
+
+    if not found_user:
+        logger.warning(f"Key bundle requested for unknown username: {username}")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    return await get_bundle(found_user.telegram_id, _user, db)
 
 
 @router.get(

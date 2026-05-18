@@ -10,10 +10,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.bot.bot import bot
 from app.core.database import get_db
 from app.core.logger import logger
 from app.core.security import get_current_user
-from app.models.models import Message
+from app.models.models import Message, User
 from app.schemas.schemas import (
     InboxResponse,
     MessageResponse,
@@ -41,16 +42,25 @@ async def send_message(
     """
     sender_id: int = user["id"]
 
-    db.add(
-        Message(
-            recipient_id=body.recipient_id,
-            sender_id=sender_id,
-            encrypted_payload=body.encrypted_payload,
-        )
-    )
+    db.add(Message(
+        recipient_id=body.recipient_id,
+        sender_id=sender_id,
+        encrypted_payload=body.encrypted_payload,
+    ))
+    await db.flush()
+
+    sender = await db.get(User, sender_id)
+    sender_name = f"@{sender.username}" if sender and sender.username else str(sender_id)
 
     logger.info(f"Message relay: {sender_id} -> {body.recipient_id}")
-    # TODO: send Telegram notification to recipient via aiogram bot instance.
+
+    try:
+        await bot.send_message(
+            chat_id=body.recipient_id,
+            text=f"🔒 New encrypted message from {sender_name}\n\nOpen TrustGram to read it.",
+        )
+    except Exception:
+        pass  # recipient may not have started the bot — don't fail the send
 
     return StatusResponse(detail="Message delivered to inbox")
 
@@ -71,20 +81,26 @@ async def get_inbox(
     """
     telegram_id: int = user["id"]
 
-    stmt = select(Message).where(Message.recipient_id == telegram_id).order_by(Message.timestamp.asc())
+    stmt = (
+        select(Message, User.username)
+        .outerjoin(User, Message.sender_id == User.telegram_id)
+        .where(Message.recipient_id == telegram_id)
+        .order_by(Message.timestamp.asc())
+    )
     result = await db.execute(stmt)
-    messages = result.scalars().all()
+    rows = result.all()
 
-    logger.debug(f"User {telegram_id} fetched inbox: {len(messages)} messages")
+    logger.debug(f"User {telegram_id} fetched inbox: {len(rows)} messages")
     return InboxResponse(
         messages=[
             MessageResponse(
                 id=m.id,
                 sender_id=m.sender_id,
+                sender_username=username,
                 encrypted_payload=m.encrypted_payload,
                 timestamp=m.timestamp,
             )
-            for m in messages
+            for m, username in rows
         ]
     )
 

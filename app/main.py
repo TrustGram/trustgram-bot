@@ -18,6 +18,7 @@ from pathlib import Path
 
 from aiogram import types as aio_types
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 
 from app.api.v1.router import router as api_v1_router
@@ -64,6 +65,17 @@ app = FastAPI(
     docs_url=None,
     redoc_url=None,
     openapi_url=None,
+)
+
+
+# ── CORS ─────────────────────────────────────────────────────
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_origin_regex=settings.cors_origin_regex,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
