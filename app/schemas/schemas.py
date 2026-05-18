@@ -7,7 +7,7 @@ The server treats them as opaque — no parsing, no validation beyond presence.
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 
 # ═══════════════════════════════════════════════════════════════
 # Key Management
@@ -66,6 +66,11 @@ class MessageResponse(BaseModel):
     sender_username: str | None = None
     encrypted_payload: str
     timestamp: datetime
+
+    @field_serializer("timestamp")
+    def serialize_timestamp(self, v: datetime) -> str:
+        ms = v.microsecond // 1000
+        return v.strftime("%Y-%m-%dT%H:%M:%S.") + f"{ms:03d}Z"
 
 
 class InboxResponse(BaseModel):
