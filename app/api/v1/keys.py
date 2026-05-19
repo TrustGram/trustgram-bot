@@ -143,6 +143,9 @@ async def get_bundle(
             detail="User has no registered bundle",
         )
 
+    user_result = await db.execute(select(User).where(User.telegram_id == telegram_id))
+    user = user_result.scalar_one_or_none()
+
     # Pop one OTK (first-come, first-served).
     otk_stmt = select(OneTimeKey).where(OneTimeKey.user_id == telegram_id).limit(1)
     otk_result = await db.execute(otk_stmt)
@@ -158,6 +161,7 @@ async def get_bundle(
 
     return PublicBundleResponse(
         telegram_id=telegram_id,
+        telegram_username=user.username if user else None,
         identity_key=bundle.identity_key,
         signed_pre_key=bundle.signed_pre_key,
         signature=bundle.signature,

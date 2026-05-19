@@ -34,6 +34,7 @@ class PublicBundleResponse(BaseModel):
     """GET /keys/{telegram_id} — Bob's public bundle for session setup."""
 
     telegram_id: int
+    telegram_username: str | None = None
     identity_key: str
     signed_pre_key: str
     signature: str
