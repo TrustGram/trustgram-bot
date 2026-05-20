@@ -14,6 +14,7 @@ Covers
 import hashlib
 import hmac
 import json
+import time
 import urllib.parse
 from unittest.mock import patch
 
@@ -25,12 +26,12 @@ from app.core.security import _validate_init_data, get_current_user
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
-def _build_valid_init_data(bot_token: str, user_payload: dict) -> str:
+def _build_valid_init_data(bot_token: str, user_payload: dict, auth_date: int | None = None) -> str:
     """Build a correctly HMAC-signed initData string matching Telegram's spec."""
     user_json = json.dumps(user_payload, separators=(",", ":"))
     params = {
         "user": user_json,
-        "auth_date": "1700000000",
+        "auth_date": str(auth_date if auth_date is not None else int(time.time())),
         "chat_instance": "-99999",
     }
     # Build the check string.
@@ -57,6 +58,7 @@ class TestValidateInitData:
         init_data = _build_valid_init_data(FAKE_TOKEN, FAKE_USER)
         with patch("app.core.security.settings") as mock_settings:
             mock_settings.bot_token = FAKE_TOKEN
+            mock_settings.init_data_max_age_seconds = 86400
             result = _validate_init_data(init_data)
         assert result["id"] == 42
         assert result["username"] == "alice"
@@ -80,9 +82,33 @@ class TestValidateInitData:
         assert exc.value.status_code == 403
         assert "Invalid initData signature" in exc.value.detail
 
+    def test_expired_auth_date_raises_403(self):
+        # 48 hours old → past the 24h ceiling
+        old_ts = int(time.time()) - 48 * 3600
+        init_data = _build_valid_init_data(FAKE_TOKEN, FAKE_USER, auth_date=old_ts)
+        with patch("app.core.security.settings") as mock_settings:
+            mock_settings.bot_token = FAKE_TOKEN
+            mock_settings.init_data_max_age_seconds = 86400
+            with pytest.raises(HTTPException) as exc:
+                _validate_init_data(init_data)
+        assert exc.value.status_code == 403
+        assert "expired" in exc.value.detail
+
+    def test_future_auth_date_raises_403(self):
+        # 1 hour in the future → outside the +5min clock-skew window
+        future_ts = int(time.time()) + 3600
+        init_data = _build_valid_init_data(FAKE_TOKEN, FAKE_USER, auth_date=future_ts)
+        with patch("app.core.security.settings") as mock_settings:
+            mock_settings.bot_token = FAKE_TOKEN
+            mock_settings.init_data_max_age_seconds = 86400
+            with pytest.raises(HTTPException) as exc:
+                _validate_init_data(init_data)
+        assert exc.value.status_code == 403
+        assert "expired" in exc.value.detail
+
     def test_missing_user_field_raises_403(self):
         """Build a valid HMAC but without the user field."""
-        params = {"auth_date": "1700000000"}
+        params = {"auth_date": str(int(time.time()))}
         data_check_parts = sorted(f"{k}={v}" for k, v in params.items())
         data_check_string = "\n".join(data_check_parts)
         secret_key = hmac.new(b"WebAppData", FAKE_TOKEN.encode(), hashlib.sha256).digest()
@@ -92,6 +118,7 @@ class TestValidateInitData:
 
         with patch("app.core.security.settings") as mock_settings:
             mock_settings.bot_token = FAKE_TOKEN
+            mock_settings.init_data_max_age_seconds = 86400
             with pytest.raises(HTTPException) as exc:
                 _validate_init_data(init_data)
         assert exc.value.status_code == 403
@@ -114,5 +141,6 @@ class TestGetCurrentUser:
         init_data = _build_valid_init_data(FAKE_TOKEN, FAKE_USER)
         with patch("app.core.security.settings") as mock_settings:
             mock_settings.bot_token = FAKE_TOKEN
+            mock_settings.init_data_max_age_seconds = 86400
             result = await get_current_user(x_init_data=init_data)
         assert result["id"] == 42

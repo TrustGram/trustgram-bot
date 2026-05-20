@@ -33,6 +33,16 @@ class Settings(BaseSettings):
     api_v1_prefix: str = "/api/v1"
     project_name: str = "TrustGram"
 
+    # ── Security ──────────────────────────────────────────────
+    # Reject initData older than this. Telegram refreshes it on every Mini App
+    # open, so a 24h window keeps active sessions alive while killing replays.
+    init_data_max_age_seconds: int = 86400
+
+    # ── Rate limiting ─────────────────────────────────────────
+    # In-memory works for single-instance deployments. For multi-worker setups
+    # set to e.g. "redis://localhost:6379" so limits are shared.
+    rate_limit_storage_uri: str = "memory://"
+
     # ── Logging ───────────────────────────────────────────────
     log_level: str = "INFO"
     log_format: str = "%(asctime)s | %(levelname)-8s | %(name)s:%(funcName)s:%(lineno)d - %(message)s"

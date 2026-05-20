@@ -6,13 +6,14 @@ GET    /chat/inbox          — fetch all pending encrypted messages.
 DELETE /chat/message/{id}   — acknowledge & delete a consumed message.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.bot import bot
 from app.core.database import get_db
 from app.core.logger import logger
+from app.core.rate_limit import limiter
 from app.core.security import get_current_user
 from app.models.models import Message, User
 from app.schemas.schemas import (
@@ -31,7 +32,9 @@ router = APIRouter(prefix="/chat", tags=["chat"])
     status_code=status.HTTP_201_CREATED,
     summary="Send an encrypted message",
 )
+@limiter.limit("60/minute")
 async def send_message(
+    request: Request,
     body: SendMessageRequest,
     user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -72,7 +75,9 @@ async def send_message(
     response_model=InboxResponse,
     summary="Fetch pending messages",
 )
+@limiter.limit("120/minute")
 async def get_inbox(
+    request: Request,
     user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -112,7 +117,9 @@ async def get_inbox(
     response_model=StatusResponse,
     summary="Acknowledge & delete a message",
 )
+@limiter.limit("300/minute")
 async def delete_message(
+    request: Request,
     message_id: int,
     user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

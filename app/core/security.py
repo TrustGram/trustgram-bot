@@ -11,6 +11,7 @@ Reference: https://core.telegram.org/bots/webapps#validating-data-received-via-t
 import hashlib
 import hmac
 import json
+import time
 from urllib.parse import parse_qs
 
 from fastapi import Header, HTTPException, status
@@ -54,6 +55,28 @@ def _validate_init_data(init_data: str) -> dict:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid initData signature",
+        )
+
+    # Reject stale initData. Telegram refreshes it on every Mini App open;
+    # a 24h ceiling prevents replay if a hash leaks from logs/extensions.
+    auth_date_raw = parsed.get("auth_date", [None])[0]
+    if not auth_date_raw:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Missing auth_date in initData",
+        )
+    try:
+        auth_date = int(auth_date_raw)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Malformed auth_date in initData",
+        ) from None
+    age = time.time() - auth_date
+    if age > settings.init_data_max_age_seconds or age < -300:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="initData expired — reopen the Mini App",
         )
 
     # Extract user object.

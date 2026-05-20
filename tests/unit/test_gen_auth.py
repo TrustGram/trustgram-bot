@@ -1,3 +1,5 @@
+import time
+
 import pytest
 
 from app.core.config import settings
@@ -33,7 +35,7 @@ def test_generate_auth_with_all_fields():
     username = "full_user"
     first_name = "Alice"
     last_name = "Smith"
-    auth_date = 1700000000
+    auth_date = int(time.time())
 
     init_data = generate_init_data(
         bot_token=bot_token,

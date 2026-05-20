@@ -6,12 +6,13 @@ GET  /keys/{tg_id}    — fetch a user's public bundle (+ consume one OTK).
 POST /keys/otk        — refill one-time pre-keys.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.logger import logger
+from app.core.rate_limit import limiter
 from app.core.security import get_current_user
 from app.models.models import OneTimeKey, PublicBundle, User
 from app.schemas.schemas import (
@@ -33,7 +34,9 @@ router = APIRouter(prefix="/keys", tags=["keys"])
     status_code=status.HTTP_201_CREATED,
     summary="Register public key bundle",
 )
+@limiter.limit("5/hour")
 async def register_bundle(
+    request: Request,
     body: RegisterBundleRequest,
     user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -101,7 +104,9 @@ async def register_bundle(
     response_model=PublicBundleResponse,
     summary="Fetch a user's public bundle by username",
 )
+@limiter.limit("20/minute")
 async def get_bundle_by_username(
+    request: Request,
     username: str,
     _user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -117,7 +122,7 @@ async def get_bundle_by_username(
         logger.warning(f"Key bundle requested for unknown username: {username}")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    return await get_bundle(found_user.telegram_id, _user, db)
+    return await get_bundle(request, found_user.telegram_id, _user, db)
 
 
 @router.get(
@@ -125,7 +130,9 @@ async def get_bundle_by_username(
     response_model=PublicBundleResponse,
     summary="Fetch a user's public bundle",
 )
+@limiter.limit("20/minute")
 async def get_bundle(
+    request: Request,
     telegram_id: int,
     _user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -178,7 +185,9 @@ async def get_bundle(
     response_model=OTKCountResponse,
     summary="Get remaining OTK count for the current user",
 )
+@limiter.limit("30/minute")
 async def get_otk_count(
+    request: Request,
     user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -193,7 +202,9 @@ async def get_otk_count(
     response_model=StatusResponse,
     summary="Rotate signed pre-key without touching OTKs",
 )
+@limiter.limit("10/hour")
 async def update_spk(
+    request: Request,
     body: UpdateSPKRequest,
     user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -220,7 +231,9 @@ async def update_spk(
     response_model=StatusResponse,
     summary="Refill one-time pre-keys",
 )
+@limiter.limit("10/hour")
 async def refill_otk(
+    request: Request,
     body: RefillOTKRequest,
     user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

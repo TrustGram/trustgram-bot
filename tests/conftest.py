@@ -34,8 +34,13 @@ _bot_patch.start()
 
 # Now it's safe to import app code.
 from app.core.database import Base, get_db  # noqa: E402
+from app.core.rate_limit import limiter  # noqa: E402
 from app.core.security import get_current_user  # noqa: E402
 from app.main import app  # noqa: E402
+
+# Disable rate limiting globally for the test suite — integration tests
+# legitimately fire dozens of requests in seconds and would otherwise 429.
+limiter.enabled = False
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
