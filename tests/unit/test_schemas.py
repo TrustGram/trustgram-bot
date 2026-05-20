@@ -45,12 +45,16 @@ class TestOneTimeKeySchema:
 # ── RegisterBundleRequest ────────────────────────────────────────────────────
 
 
+_VALID_SIG = "a" * 88  # base64 ECDSA P-256 signature length
+
+
 class TestRegisterBundleRequest:
     def test_valid_with_otks(self):
         req = RegisterBundleRequest(
             identity_key="ik",
+            signing_key="sk",
             signed_pre_key="spk",
-            signature="sig",
+            signature=_VALID_SIG,
             one_time_keys=[{"key_id": "1", "public_key": "pk1"}],
         )
         assert len(req.one_time_keys) == 1
@@ -58,14 +62,29 @@ class TestRegisterBundleRequest:
     def test_defaults_to_empty_otks(self):
         req = RegisterBundleRequest(
             identity_key="ik",
+            signing_key="sk",
             signed_pre_key="spk",
-            signature="sig",
+            signature=_VALID_SIG,
         )
         assert req.one_time_keys == []
 
     def test_missing_identity_key(self):
         with pytest.raises(ValidationError):
-            RegisterBundleRequest(signed_pre_key="spk", signature="sig")
+            RegisterBundleRequest(signing_key="sk", signed_pre_key="spk", signature=_VALID_SIG)
+
+    def test_missing_signing_key(self):
+        with pytest.raises(ValidationError):
+            RegisterBundleRequest(identity_key="ik", signed_pre_key="spk", signature=_VALID_SIG)
+
+    def test_short_signature_rejected(self):
+        """Signature must be at least SIGNATURE_MIN_LEN — empty/stub signatures are not accepted."""
+        with pytest.raises(ValidationError):
+            RegisterBundleRequest(
+                identity_key="ik",
+                signing_key="sk",
+                signed_pre_key="spk",
+                signature="too-short",
+            )
 
 
 # ── PublicBundleResponse ─────────────────────────────────────────────────────
@@ -76,6 +95,7 @@ class TestPublicBundleResponse:
         resp = PublicBundleResponse(
             telegram_id=123,
             identity_key="ik",
+            signing_key="sk",
             signed_pre_key="spk",
             signature="sig",
             one_time_key={"key_id": "k1", "public_key": "pk1"},
@@ -87,6 +107,7 @@ class TestPublicBundleResponse:
         resp = PublicBundleResponse(
             telegram_id=123,
             identity_key="ik",
+            signing_key="sk",
             signed_pre_key="spk",
             signature="sig",
         )

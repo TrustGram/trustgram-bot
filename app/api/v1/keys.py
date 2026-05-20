@@ -70,6 +70,7 @@ async def register_bundle(
 
     if bundle:
         bundle.identity_key = body.identity_key
+        bundle.signing_key = body.signing_key
         bundle.signed_pre_key = body.signed_pre_key
         bundle.signature = body.signature
     else:
@@ -77,6 +78,7 @@ async def register_bundle(
             PublicBundle(
                 user_id=telegram_id,
                 identity_key=body.identity_key,
+                signing_key=body.signing_key,
                 signed_pre_key=body.signed_pre_key,
                 signature=body.signature,
             )
@@ -174,6 +176,7 @@ async def get_bundle(
         telegram_id=telegram_id,
         telegram_username=user.username if user else None,
         identity_key=bundle.identity_key,
+        signing_key=bundle.signing_key,
         signed_pre_key=bundle.signed_pre_key,
         signature=bundle.signature,
         one_time_key=otk_out,

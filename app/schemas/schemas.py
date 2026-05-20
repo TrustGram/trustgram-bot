@@ -15,7 +15,9 @@ from pydantic import BaseModel, Field, field_serializer
 # Public keys are base64(P-256 raw) ≈ 88 bytes; allow some slack for JWK/future curves.
 KEY_MAX_LEN = 512
 KEY_ID_MAX_LEN = 64
+# ECDSA P-256 raw signature is 64 bytes → 88 base64; SPKI public key ≈ 124 base64. Allow slack.
 SIGNATURE_MAX_LEN = 256
+SIGNATURE_MIN_LEN = 64
 # Files capped at 512 KB in the UI; after base64 + JSON wrapping ≈ 720 KB. Round up to 1 MB.
 PAYLOAD_MAX_LEN = 1_048_576
 OTK_BATCH_MAX = 100
@@ -37,8 +39,9 @@ class RegisterBundleRequest(BaseModel):
     """POST /keys/register — initial public bundle upload."""
 
     identity_key: str = Field(min_length=1, max_length=KEY_MAX_LEN)
+    signing_key: str = Field(min_length=1, max_length=KEY_MAX_LEN)
     signed_pre_key: str = Field(min_length=1, max_length=KEY_MAX_LEN)
-    signature: str = Field(default="", max_length=SIGNATURE_MAX_LEN)
+    signature: str = Field(min_length=SIGNATURE_MIN_LEN, max_length=SIGNATURE_MAX_LEN)
     one_time_keys: list[OneTimeKeySchema] = Field(default_factory=list, max_length=OTK_BATCH_MAX)
 
 
@@ -48,6 +51,7 @@ class PublicBundleResponse(BaseModel):
     telegram_id: int
     telegram_username: str | None = None
     identity_key: str
+    signing_key: str
     signed_pre_key: str
     signature: str
     one_time_key: OneTimeKeySchema | None = None
@@ -69,7 +73,7 @@ class UpdateSPKRequest(BaseModel):
     """PUT /keys/spk — rotate signed pre-key without touching OTKs."""
 
     signed_pre_key: str = Field(min_length=1, max_length=KEY_MAX_LEN)
-    signature: str = Field(default="", max_length=SIGNATURE_MAX_LEN)
+    signature: str = Field(min_length=SIGNATURE_MIN_LEN, max_length=SIGNATURE_MAX_LEN)
 
 
 # ═══════════════════════════════════════════════════════════════

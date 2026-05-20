@@ -39,6 +39,7 @@ class PublicBundle(Base):
         BigInteger, ForeignKey("users.telegram_id", ondelete="CASCADE"), unique=True, index=True
     )
     identity_key: Mapped[str] = mapped_column(Text, nullable=False)
+    signing_key: Mapped[str] = mapped_column(Text, nullable=False)
     signed_pre_key: Mapped[str] = mapped_column(Text, nullable=False)
     signature: Mapped[str] = mapped_column(Text, nullable=False)
 

@@ -23,8 +23,9 @@ from httpx import AsyncClient
 
 BUNDLE_PAYLOAD = {
     "identity_key": "base64_ik",
+    "signing_key": "base64_signing_key",
     "signed_pre_key": "base64_spk",
-    "signature": "base64_sig",
+    "signature": "a" * 88,  # base64 ECDSA P-256 signature (~88 chars); content not verified server-side
     "one_time_keys": [
         {"key_id": "otk-1", "public_key": "otk_pk_1"},
         {"key_id": "otk-2", "public_key": "otk_pk_2"},
@@ -49,8 +50,9 @@ class TestRegisterBundle:
         # Rotation with different keys
         rotated = {
             "identity_key": "new_ik",
+            "signing_key": "new_signing",
             "signed_pre_key": "new_spk",
-            "signature": "new_sig",
+            "signature": "b" * 88,
             "one_time_keys": [],
         }
         resp = await client.post("/api/v1/keys/register", json=rotated)
