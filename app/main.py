@@ -22,7 +22,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from slowapi.middleware import SlowAPIMiddleware
 
 from app.api.v1.router import router as api_v1_router
 from app.bot.bot import bot, dp, on_shutdown, on_startup
@@ -78,10 +77,14 @@ app = FastAPI(
 
 
 # ── Rate limiting ────────────────────────────────────────────
+# Per-route enforcement is done by the @limiter.limit decorator. We deliberately
+# do NOT register SlowAPIMiddleware: when it raises RateLimitExceeded it bypasses
+# the ExceptionMiddleware (and therefore the registered handler), so the 429
+# response never goes through CORSMiddleware and the browser sees a CORS error
+# instead of the rate-limit JSON.
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-app.add_middleware(SlowAPIMiddleware)
 
 
 # ── CORS ─────────────────────────────────────────────────────
