@@ -181,9 +181,7 @@ async def get_otk_count(
     db: AsyncSession = Depends(get_db),
 ):
     telegram_id: int = user["id"]
-    result = await db.execute(
-        select(func.count()).select_from(OneTimeKey).where(OneTimeKey.user_id == telegram_id)
-    )
+    result = await db.execute(select(func.count()).select_from(OneTimeKey).where(OneTimeKey.user_id == telegram_id))
     count = result.scalar_one()
     return OTKCountResponse(count=count)
 
