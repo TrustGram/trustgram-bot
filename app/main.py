@@ -20,6 +20,7 @@ from aiogram import types as aio_types
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
+from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -85,6 +86,22 @@ app = FastAPI(
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+# ── Catch-all exception handler ──────────────────────────────
+# Without this, uncaught exceptions are handled by ServerErrorMiddleware, which
+# sits OUTSIDE the user-added CORSMiddleware. The resulting 500 response never
+# picks up CORS headers, so the browser reports a CORS error and swallows the
+# real cause. Registering a handler hooks into ExceptionMiddleware (inside CORS),
+# letting the 500 response flow back through CORSMiddleware as it should.
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    logger.exception("Unhandled exception on %s %s: %s", request.method, request.url.path, exc)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"{type(exc).__name__}: {exc}"},
+    )
 
 
 # ── CORS ─────────────────────────────────────────────────────
