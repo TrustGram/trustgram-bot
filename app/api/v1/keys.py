@@ -34,7 +34,7 @@ router = APIRouter(prefix="/keys", tags=["keys"])
     status_code=status.HTTP_201_CREATED,
     summary="Register public key bundle",
 )
-@limiter.limit("5/hour")
+@limiter.limit("20/hour")
 async def register_bundle(
     request: Request,
     body: RegisterBundleRequest,
