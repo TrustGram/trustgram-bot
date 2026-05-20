@@ -47,6 +47,19 @@ class RefillOTKRequest(BaseModel):
     one_time_keys: list[OneTimeKeySchema] = Field(min_length=1)
 
 
+class OTKCountResponse(BaseModel):
+    """GET /keys/otk/count — how many OTKs are left on the server."""
+
+    count: int
+
+
+class UpdateSPKRequest(BaseModel):
+    """PUT /keys/spk — rotate signed pre-key without touching OTKs."""
+
+    signed_pre_key: str
+    signature: str
+
+
 # ═══════════════════════════════════════════════════════════════
 # Messaging
 # ═══════════════════════════════════════════════════════════════

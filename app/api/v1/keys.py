@@ -7,7 +7,7 @@ POST /keys/otk        — refill one-time pre-keys.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -15,11 +15,13 @@ from app.core.logger import logger
 from app.core.security import get_current_user
 from app.models.models import OneTimeKey, PublicBundle, User
 from app.schemas.schemas import (
+    OTKCountResponse,
     OneTimeKeySchema,
     PublicBundleResponse,
     RefillOTKRequest,
     RegisterBundleRequest,
     StatusResponse,
+    UpdateSPKRequest,
 )
 
 router = APIRouter(prefix="/keys", tags=["keys"])
@@ -167,6 +169,50 @@ async def get_bundle(
         signature=bundle.signature,
         one_time_key=otk_out,
     )
+
+
+@router.get(
+    "/otk/count",
+    response_model=OTKCountResponse,
+    summary="Get remaining OTK count for the current user",
+)
+async def get_otk_count(
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    telegram_id: int = user["id"]
+    result = await db.execute(
+        select(func.count()).select_from(OneTimeKey).where(OneTimeKey.user_id == telegram_id)
+    )
+    count = result.scalar_one()
+    return OTKCountResponse(count=count)
+
+
+@router.put(
+    "/spk",
+    response_model=StatusResponse,
+    summary="Rotate signed pre-key without touching OTKs",
+)
+async def update_spk(
+    body: UpdateSPKRequest,
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    telegram_id: int = user["id"]
+    stmt = select(PublicBundle).where(PublicBundle.user_id == telegram_id)
+    result = await db.execute(stmt)
+    bundle = result.scalar_one_or_none()
+
+    if not bundle:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No bundle registered for this user",
+        )
+
+    bundle.signed_pre_key = body.signed_pre_key
+    bundle.signature = body.signature
+    logger.info(f"SPK rotated for user {telegram_id}")
+    return StatusResponse(detail="SPK updated")
 
 
 @router.post(
