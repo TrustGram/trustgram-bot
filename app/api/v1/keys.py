@@ -106,6 +106,8 @@ async def get_bundle_by_username(
     _user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    if len(username) > 64:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username too long")
     username = username.lstrip("@").lower()
     stmt = select(User).where(User.username == username)
     result = await db.execute(stmt)
