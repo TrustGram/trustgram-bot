@@ -10,9 +10,8 @@ running them) so that future migrations apply cleanly.
 """
 
 import subprocess
-import sys
 
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, inspect
 
 from app.core.config import settings
 
@@ -37,7 +36,7 @@ def main() -> None:
 
     if has_schema and not has_alembic:
         print("Existing schema detected without Alembic version table — stamping head.")
-        result = subprocess.run(["alembic", "stamp", "head"], check=True)
+        subprocess.run(["alembic", "stamp", "head"], check=True)
         print("Stamped.")
 
     print("Running alembic upgrade head...")

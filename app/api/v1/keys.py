@@ -15,8 +15,8 @@ from app.core.logger import logger
 from app.core.security import get_current_user
 from app.models.models import OneTimeKey, PublicBundle, User
 from app.schemas.schemas import (
-    OTKCountResponse,
     OneTimeKeySchema,
+    OTKCountResponse,
     PublicBundleResponse,
     RefillOTKRequest,
     RegisterBundleRequest,

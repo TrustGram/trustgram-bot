@@ -9,15 +9,14 @@ migrations.  Supports online (async engine) and offline (SQL script) modes.
 import asyncio
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from app.core.config import settings
-from app.core.database import Base
-
 # Import all models so Base.metadata is fully populated.
 import app.models.models  # noqa: F401
+from alembic import context
+from app.core.config import settings
+from app.core.database import Base
 
 # ── Alembic Config object ────────────────────────────────────
 config = context.config

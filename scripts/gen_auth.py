@@ -17,7 +17,7 @@ import json
 import os
 import sys
 import time
-from urllib.parse import quote, urlencode
+from urllib.parse import urlencode
 
 from dotenv import load_dotenv
 
