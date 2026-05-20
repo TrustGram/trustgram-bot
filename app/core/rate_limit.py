@@ -40,5 +40,9 @@ def _user_key(request: Request) -> str:
 limiter = Limiter(
     key_func=_user_key,
     storage_uri=settings.rate_limit_storage_uri,
-    headers_enabled=True,
+    # headers_enabled would inject X-RateLimit-* headers into the endpoint's
+    # response, but only if every decorated endpoint declares a
+    # `response: Response` parameter — otherwise slowapi raises on every call.
+    # We don't expose those headers to clients, so keep this off.
+    headers_enabled=False,
 )
