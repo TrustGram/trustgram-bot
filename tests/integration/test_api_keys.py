@@ -202,3 +202,64 @@ class TestRefillOTK:
         resp2 = await client.get("/api/v1/keys/12345678")
         assert resp2.json()["one_time_key"] is not None
         assert resp2.json()["one_time_key"]["key_id"] in ["r-1", "r-2"]
+
+    @pytest.mark.asyncio
+    async def test_otk_count_endpoint(self, client: AsyncClient):
+        """/otk/count returns the number of remaining OTKs for the current user."""
+        await client.post("/api/v1/keys/register", json=BUNDLE_PAYLOAD)
+        resp = await client.get("/api/v1/keys/otk/count")
+        assert resp.status_code == 200
+        assert resp.json()["count"] == 2
+
+        # Consume one and recount.
+        await client.get("/api/v1/keys/12345678")
+        resp2 = await client.get("/api/v1/keys/otk/count")
+        assert resp2.json()["count"] == 1
+
+
+class TestUpdateSPK:
+    @pytest.mark.asyncio
+    async def test_spk_rotation_updates_bundle(self, client: AsyncClient):
+        """PUT /keys/spk must update the signed pre-key and signature in place."""
+        await client.post("/api/v1/keys/register", json=BUNDLE_PAYLOAD)
+        new_spk = {
+            "signed_pre_key": "rotated_spk_value",
+            "signature": "b" * 88,
+        }
+        resp = await client.put("/api/v1/keys/spk", json=new_spk)
+        assert resp.status_code == 200
+        assert resp.json()["ok"] is True
+
+        bundle_resp = await client.get("/api/v1/keys/12345678")
+        body = bundle_resp.json()
+        assert body["signed_pre_key"] == "rotated_spk_value"
+        assert body["signature"] == "b" * 88
+        # Other fields must remain untouched.
+        assert body["identity_key"] == BUNDLE_PAYLOAD["identity_key"]
+
+    @pytest.mark.asyncio
+    async def test_spk_rotation_without_existing_bundle_returns_404(self, client: AsyncClient):
+        """Cannot rotate SPK if you never registered."""
+        resp = await client.put(
+            "/api/v1/keys/spk",
+            json={"signed_pre_key": "x", "signature": "c" * 88},
+        )
+        assert resp.status_code == 404
+        assert "No bundle" in resp.json()["detail"]
+
+
+class TestUsernameLookupEdgeCases:
+    @pytest.mark.asyncio
+    async def test_by_username_unknown_returns_404(self, client: AsyncClient):
+        """Lookup by an unregistered username returns 404, not 500."""
+        resp = await client.get("/api/v1/keys/by-username/ghost")
+        assert resp.status_code == 404
+        assert resp.json()["detail"] == "User not found"
+
+    @pytest.mark.asyncio
+    async def test_by_username_oversized_rejected(self, client: AsyncClient):
+        """Username longer than 64 chars is rejected before hitting the DB."""
+        long_name = "x" * 65
+        resp = await client.get(f"/api/v1/keys/by-username/{long_name}")
+        assert resp.status_code == 400
+        assert "too long" in resp.json()["detail"].lower()

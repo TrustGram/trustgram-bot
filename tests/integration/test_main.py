@@ -8,10 +8,11 @@ Covers
 - Lifespan hooks     → on_startup / on_shutdown are called correctly
 """
 
+import asyncio
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 
 
 class TestHealthEndpoint:
@@ -102,3 +103,114 @@ class TestWebhookEndpoint:
                 )
         assert response.status_code == 404
         mock_feed.assert_not_called()
+
+
+class TestDocsAccess:
+    @pytest.mark.asyncio
+    async def test_docs_open_in_development(self, client: AsyncClient):
+        """In development, /docs requires no key."""
+        with patch("app.main.settings.environment", "development"):
+            response = await client.get("/docs")
+        assert response.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_docs_blocked_in_production_without_key(self, client: AsyncClient):
+        """In production without the header, /docs returns 404 (not 401)."""
+        with (
+            patch("app.main.settings.environment", "production"),
+            patch("app.main.settings.docs_api_key", "secret-key"),
+        ):
+            response = await client.get("/docs")
+        assert response.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_docs_blocked_in_production_with_wrong_key(self, client: AsyncClient):
+        with (
+            patch("app.main.settings.environment", "production"),
+            patch("app.main.settings.docs_api_key", "secret-key"),
+        ):
+            response = await client.get("/docs", headers={"X-Docs-Key": "wrong"})
+        assert response.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_docs_allowed_in_production_with_correct_key(self, client: AsyncClient):
+        with (
+            patch("app.main.settings.environment", "production"),
+            patch("app.main.settings.docs_api_key", "secret-key"),
+        ):
+            response = await client.get("/docs", headers={"X-Docs-Key": "secret-key"})
+        assert response.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_redoc_gated_same_way(self, client: AsyncClient):
+        with patch("app.main.settings.environment", "development"):
+            response = await client.get("/redoc")
+        assert response.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_openapi_json_gated_same_way(self, client: AsyncClient):
+        with patch("app.main.settings.environment", "development"):
+            response = await client.get("/openapi.json")
+        assert response.status_code == 200
+        assert "openapi" in response.json()
+
+
+class TestUnhandledExceptionHandler:
+    @pytest.mark.asyncio
+    async def test_uncaught_exception_returns_json_500(self):
+        """
+        The catch-all exception handler must turn uncaught errors into a JSON
+        500 (so CORS headers flow back through the middleware stack and the
+        browser sees the real cause instead of a CORS error).
+
+        We need a transport with raise_app_exceptions=False — by default httpx's
+        ASGITransport re-raises any exception that bubbles past the registered
+        handlers (even though our handler converted it into a 500 response).
+        """
+        from app.core.database import get_db
+        from app.core.security import get_current_user
+        from app.main import app
+        from tests.conftest import MOCK_USER
+
+        app.dependency_overrides[get_current_user] = lambda: MOCK_USER
+
+        async def _noop_db():
+            yield None
+
+        app.dependency_overrides[get_db] = _noop_db
+
+        try:
+            transport = ASGITransport(app=app, raise_app_exceptions=False)
+            async with AsyncClient(transport=transport, base_url="http://test") as ac:
+                with patch("app.main.dp.feed_update", new_callable=AsyncMock, side_effect=RuntimeError("kaboom")):
+                    response = await ac.post("/webhook", json=_FAKE_UPDATE)
+            assert response.status_code == 500
+            body = response.json()
+            assert "RuntimeError" in body["detail"]
+            assert "kaboom" in body["detail"]
+        finally:
+            app.dependency_overrides.clear()
+
+
+class TestLifespanCleanupTimeout:
+    @pytest.mark.asyncio
+    async def test_cleanup_task_timeout_triggers_cancel(self):
+        """
+        If the inbox cleanup task doesn't stop within the wait_for window,
+        lifespan must cancel it instead of hanging shutdown forever.
+        """
+        from app.main import lifespan
+
+        async def never_stop(stop_event):
+            # Ignore the stop_event entirely — we want to force the timeout path.
+            while True:
+                await asyncio.sleep(60)
+
+        with (
+            patch("app.main.on_startup", new_callable=AsyncMock),
+            patch("app.main.on_shutdown", new_callable=AsyncMock),
+            patch("app.main.inbox_cleanup_loop", side_effect=never_stop),
+            patch("app.main.asyncio.wait_for", side_effect=asyncio.TimeoutError),
+        ):
+            async with lifespan(None):
+                pass
