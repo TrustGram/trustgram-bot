@@ -68,7 +68,8 @@ class Message(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     recipient_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("users.telegram_id", ondelete="CASCADE"),
+        BigInteger,
+        ForeignKey("users.telegram_id", ondelete="CASCADE"),
     )
     sender_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     encrypted_payload: Mapped[str] = mapped_column(Text, nullable=False)

@@ -21,10 +21,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS users_username_lower_idx "
-        "ON users (LOWER(username))"
-    )
+    op.execute("CREATE INDEX IF NOT EXISTS users_username_lower_idx ON users (LOWER(username))")
 
 
 def downgrade() -> None:

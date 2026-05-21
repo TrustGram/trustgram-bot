@@ -108,6 +108,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # real cause. Registering a handler hooks into ExceptionMiddleware (inside CORS),
 # letting the 500 response flow back through CORSMiddleware as it should.
 
+
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
     logger.exception("Unhandled exception on %s %s: %s", request.method, request.url.path, exc)

@@ -34,6 +34,7 @@ target_metadata = Base.metadata
 
 # ── Offline mode ──────────────────────────────────────────────
 
+
 def run_migrations_offline() -> None:
     """
     Run migrations in 'offline' mode — emit SQL to stdout
@@ -52,6 +53,7 @@ def run_migrations_offline() -> None:
 
 
 # ── Online mode (async) ──────────────────────────────────────
+
 
 def do_run_migrations(connection) -> None:
     """Run migrations with an active connection."""

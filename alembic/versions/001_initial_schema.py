@@ -31,9 +31,7 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("telegram_id"),
     )
-    op.create_index(
-        op.f("ix_users_telegram_id"), "users", ["telegram_id"], unique=False
-    )
+    op.create_index(op.f("ix_users_telegram_id"), "users", ["telegram_id"], unique=False)
 
     # ── public_bundles ────────────────────────────────────────
     op.create_table(
@@ -109,13 +107,9 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_index(op.f("ix_messages_recipient_id"), table_name="messages")
     op.drop_table("messages")
-    op.drop_index(
-        op.f("ix_one_time_keys_user_id"), table_name="one_time_keys"
-    )
+    op.drop_index(op.f("ix_one_time_keys_user_id"), table_name="one_time_keys")
     op.drop_table("one_time_keys")
-    op.drop_index(
-        op.f("ix_public_bundles_user_id"), table_name="public_bundles"
-    )
+    op.drop_index(op.f("ix_public_bundles_user_id"), table_name="public_bundles")
     op.drop_table("public_bundles")
     op.drop_index(op.f("ix_users_telegram_id"), table_name="users")
     op.drop_table("users")
