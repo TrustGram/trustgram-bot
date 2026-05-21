@@ -8,6 +8,7 @@ POST /keys/otk        — refill one-time pre-keys.
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import delete, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -46,22 +47,37 @@ async def register_bundle(
     the signature, and an initial batch of one-time pre-keys.
 
     If the user already exists, the bundle is replaced (key rotation).
+
+    Atomicity: the whole endpoint runs inside one transaction held by
+    `get_db()`. Any exception (including an inserted-OTK conflict) rolls back
+    the user upsert, bundle upsert, OTK deletion, and OTK inserts together —
+    a partial state (bundle without OTKs, etc.) cannot be observed by readers.
     """
     telegram_id: int = user["id"]
 
-    # Upsert user row.
+    # Upsert user row. Username is stored with its original case for display;
+    # lookups are case-insensitive (see get_bundle_by_username).
+    raw_username = user.get("username")
+    # Telegram caps usernames at 32 chars. Defensively reject anything larger
+    # (a 1000-char value would have to come from a tampered initData).
+    if raw_username and len(raw_username) > 32:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username too long",
+        )
     existing_user = await db.get(User, telegram_id)
     if not existing_user:
         logger.info(f"New user registration: {telegram_id}")
-        raw_username = user.get("username")
         db.add(
             User(
                 telegram_id=telegram_id,
-                username=raw_username.lower() if raw_username else None,
+                username=raw_username or None,
             )
         )
     else:
         logger.debug(f"Updating keys for existing user: {telegram_id}")
+        # Keep username in sync with the latest case from Telegram.
+        existing_user.username = raw_username or None
 
     # Upsert public bundle.
     stmt = select(PublicBundle).where(PublicBundle.user_id == telegram_id)
@@ -115,8 +131,9 @@ async def get_bundle_by_username(
 ):
     if len(username) > 64:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username too long")
-    username = username.lstrip("@").lower()
-    stmt = select(User).where(User.username == username)
+    needle = username.lstrip("@").lower()
+    # Case-insensitive lookup so callers can use any casing.
+    stmt = select(User).where(func.lower(User.username) == needle)
     result = await db.execute(stmt)
     found_user = result.scalar_one_or_none()
 
@@ -255,6 +272,17 @@ async def refill_otk(
                 public_key=otk.public_key,
             )
         )
+
+    # Flush now so a UNIQUE(user_id, key_id) collision turns into a clean 409
+    # for the client instead of leaking out of the dependency teardown.
+    try:
+        await db.flush()
+    except IntegrityError as e:
+        logger.warning(f"OTK refill rejected for {telegram_id}: duplicate key_id")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Duplicate OTK key_id",
+        ) from e
 
     logger.info(f"User {telegram_id} refilled {len(body.one_time_keys)} OTKs")
     return StatusResponse(detail=f"Added {len(body.one_time_keys)} one-time keys")

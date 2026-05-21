@@ -48,27 +48,57 @@ class TestLifespan:
             mock_shutdown.assert_called_once()
 
 
+_FAKE_UPDATE = {
+    "update_id": 1,
+    "message": {
+        "message_id": 1,
+        "from": {"id": 42, "is_bot": False, "first_name": "Alice"},
+        "chat": {"id": 42, "type": "private"},
+        "date": 1700000000,
+        "text": "hello",
+    },
+}
+
+
 class TestWebhookEndpoint:
     @pytest.mark.asyncio
-    async def test_webhook_feeds_update_to_dispatcher(self, client: AsyncClient):
-        """
-        The /webhook endpoint should pass the raw JSON to dp.feed_update and
-        return {"ok": True}. We mock dp.feed_update so no real Telegram
-        processing occurs.
-        """
-        fake_update = {
-            "update_id": 1,
-            "message": {
-                "message_id": 1,
-                "from": {"id": 42, "is_bot": False, "first_name": "Alice"},
-                "chat": {"id": 42, "type": "private"},
-                "date": 1700000000,
-                "text": "hello",
-            },
-        }
-        with patch("app.main.dp.feed_update", new_callable=AsyncMock) as mock_feed:
-            response = await client.post("/webhook", json=fake_update)
-
+    async def test_webhook_feeds_update_when_no_secret_configured(self, client: AsyncClient):
+        """With no telegram_webhook_secret set, the endpoint accepts everything (dev mode)."""
+        with patch("app.main.settings.telegram_webhook_secret", None):
+            with patch("app.main.dp.feed_update", new_callable=AsyncMock) as mock_feed:
+                response = await client.post("/webhook", json=_FAKE_UPDATE)
         assert response.status_code == 200
         assert response.json() == {"ok": True}
         mock_feed.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_webhook_accepts_matching_secret_token(self, client: AsyncClient):
+        with patch("app.main.settings.telegram_webhook_secret", "s3cr3t"):
+            with patch("app.main.dp.feed_update", new_callable=AsyncMock) as mock_feed:
+                response = await client.post(
+                    "/webhook",
+                    json=_FAKE_UPDATE,
+                    headers={"X-Telegram-Bot-Api-Secret-Token": "s3cr3t"},
+                )
+        assert response.status_code == 200
+        mock_feed.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_webhook_rejects_missing_secret_token(self, client: AsyncClient):
+        with patch("app.main.settings.telegram_webhook_secret", "s3cr3t"):
+            with patch("app.main.dp.feed_update", new_callable=AsyncMock) as mock_feed:
+                response = await client.post("/webhook", json=_FAKE_UPDATE)
+        assert response.status_code == 404
+        mock_feed.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_webhook_rejects_wrong_secret_token(self, client: AsyncClient):
+        with patch("app.main.settings.telegram_webhook_secret", "s3cr3t"):
+            with patch("app.main.dp.feed_update", new_callable=AsyncMock) as mock_feed:
+                response = await client.post(
+                    "/webhook",
+                    json=_FAKE_UPDATE,
+                    headers={"X-Telegram-Bot-Api-Secret-Token": "wrong"},
+                )
+        assert response.status_code == 404
+        mock_feed.assert_not_called()

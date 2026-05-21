@@ -134,11 +134,23 @@ app.include_router(api_v1_router, prefix=settings.api_v1_prefix)
 
 
 @app.post("/webhook", include_in_schema=False)
-async def telegram_webhook(request: Request):
+async def telegram_webhook(
+    request: Request,
+    x_telegram_bot_api_secret_token: str | None = Header(default=None),
+):
     """
     Receives Telegram updates via webhook and feeds them into
     the aiogram dispatcher.
+
+    Telegram signs each delivery with the secret-token header we configured via
+    setWebhook. When ``telegram_webhook_secret`` is set, mismatched requests are
+    rejected as 404 (not 401) so the route looks non-existent to attackers.
     """
+    expected = settings.telegram_webhook_secret
+    if expected and x_telegram_bot_api_secret_token != expected:
+        logger.warning("Webhook called with missing/invalid secret token")
+        raise HTTPException(status_code=404, detail="Not found")
+
     data = await request.json()
     update = aio_types.Update(**data)
     await dp.feed_update(bot, update)

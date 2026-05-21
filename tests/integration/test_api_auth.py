@@ -16,7 +16,7 @@ class TestAuthMe:
         response = await client.get("/api/v1/auth/me")
         assert response.status_code == 200
         data = response.json()
-        # The conftest mock user has id=12345678 and username="test_user"
+        # The conftest mock user has id=12345678 and username="Test_User"
         assert data["id"] == 12345678
-        assert data["username"] == "test_user"
+        assert data["username"] == "Test_User"
         assert data["first_name"] == "Test"

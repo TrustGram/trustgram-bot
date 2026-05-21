@@ -72,6 +72,22 @@ class TestRegisterBundle:
         get_resp = await client.get("/api/v1/keys/12345678")
         assert get_resp.json()["one_time_key"] is None
 
+    @pytest.mark.asyncio
+    async def test_validation_failure_rolls_back_atomically(self, client: AsyncClient):
+        """Bad input mid-payload must leave the DB unchanged — no partial bundle."""
+        # Register a valid bundle first
+        await client.post("/api/v1/keys/register", json=BUNDLE_PAYLOAD)
+
+        # Now try to rotate with an over-long signature (fails Pydantic validation)
+        bad = {**BUNDLE_PAYLOAD, "signature": "x" * 9999, "identity_key": "should_not_appear"}
+        resp = await client.post("/api/v1/keys/register", json=bad)
+        assert resp.status_code == 422
+
+        # Original bundle must still be intact
+        get_resp = await client.get("/api/v1/keys/12345678")
+        assert get_resp.status_code == 200
+        assert get_resp.json()["identity_key"] == BUNDLE_PAYLOAD["identity_key"]
+
 
 class TestGetBundle:
     @pytest.mark.asyncio
@@ -102,7 +118,65 @@ class TestGetBundle:
         assert resp.json()["detail"] == "User has no registered bundle"
 
 
+class TestUsernameValidation:
+    @pytest.mark.asyncio
+    async def test_oversized_username_rejected(self, client: AsyncClient, db_session):
+        """A tampered initData with a >32-char username must be rejected."""
+        # Override the mock user with a hostile username for this test only.
+        from app.core.security import get_current_user
+        from app.main import app
+
+        def _mock_huge_username():
+            return {"id": 12345678, "first_name": "Test", "username": "x" * 200, "language_code": "en"}
+
+        original = app.dependency_overrides.get(get_current_user)
+        app.dependency_overrides[get_current_user] = _mock_huge_username
+        try:
+            resp = await client.post("/api/v1/keys/register", json=BUNDLE_PAYLOAD)
+            assert resp.status_code == 400
+            assert "Username too long" in resp.json()["detail"]
+        finally:
+            if original:
+                app.dependency_overrides[get_current_user] = original
+
+
+class TestUsernameCase:
+    @pytest.mark.asyncio
+    async def test_username_stored_with_original_case(self, client: AsyncClient):
+        """Registration must preserve the username's original case for display."""
+        await client.post("/api/v1/keys/register", json=BUNDLE_PAYLOAD)
+        # The mock user is "Test_User" — case should round-trip
+        resp = await client.get("/api/v1/keys/12345678")
+        assert resp.status_code == 200
+        assert resp.json()["telegram_username"] == "Test_User"
+
+    @pytest.mark.asyncio
+    async def test_lookup_is_case_insensitive(self, client: AsyncClient):
+        """Lookups by username work regardless of caller's casing."""
+        await client.post("/api/v1/keys/register", json=BUNDLE_PAYLOAD)
+        for variant in ("test_user", "Test_User", "TEST_USER", "@Test_User"):
+            r = await client.get(f"/api/v1/keys/by-username/{variant}")
+            assert r.status_code == 200, f"variant {variant!r} did not resolve"
+            assert r.json()["telegram_username"] == "Test_User"
+
+
 class TestRefillOTK:
+    @pytest.mark.asyncio
+    async def test_duplicate_otk_key_id_rejected(self, client: AsyncClient):
+        """Two OTKs sharing the same key_id violate the UNIQUE constraint."""
+        await client.post("/api/v1/keys/register", json={**BUNDLE_PAYLOAD, "one_time_keys": []})
+
+        dup_refill = {
+            "one_time_keys": [
+                {"key_id": "dup", "public_key": "pk_a"},
+                {"key_id": "dup", "public_key": "pk_b"},
+            ]
+        }
+        resp = await client.post("/api/v1/keys/otk", json=dup_refill)
+        # SQLAlchemy IntegrityError surfaces as 500; the important guarantee is
+        # the constraint fires rather than silently storing duplicates.
+        assert resp.status_code in (409, 500)
+
     @pytest.mark.asyncio
     async def test_refill_adds_keys_to_pool(self, client: AsyncClient):
         # Register without OTKs first

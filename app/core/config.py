@@ -25,6 +25,14 @@ class Settings(BaseSettings):
     # ── Telegram ──────────────────────────────────────────────
     bot_token: str
     webapp_url: str
+    # Public HTTPS URL of this service's /webhook route. If set together with
+    # `telegram_webhook_secret`, the bot calls setWebhook on startup so Telegram
+    # signs each delivery with X-Telegram-Bot-Api-Secret-Token.
+    telegram_webhook_url: str | None = None
+    # Shared secret between this service and Telegram. When set, /webhook
+    # rejects any request whose X-Telegram-Bot-Api-Secret-Token header doesn't
+    # match. Keep this out of source control.
+    telegram_webhook_secret: str | None = None
 
     # ── Database ──────────────────────────────────────────────
     database_url: str = "sqlite+aiosqlite:///./trustgram.db"
@@ -56,7 +64,13 @@ class Settings(BaseSettings):
         "https://trustgram-ui.pages.dev",
         "https://trustgram-ui.stacksurfer.workers.dev",
     ]
-    cors_origin_regex: str = r"https://.*\.trustgram-ui\.pages\.dev"
+    # Cloudflare Pages preview deploys live at `<branch>.<project>.pages.dev`,
+    # where branch names are lowercase alphanumeric + dash. The previous `.*`
+    # also matched things like `https://x/y.trustgram-ui.pages.dev` — Starlette
+    # uses fullmatch so origins with paths can't actually slip through, but
+    # tightening the character class makes intent explicit and rejects
+    # accidentally-loose origins.
+    cors_origin_regex: str = r"https://[a-z0-9][a-z0-9-]*\.trustgram-ui\.pages\.dev"
 
     # ── Docs access ───────────────────────────────────────────
     environment: str = "development"  # "development" | "production"

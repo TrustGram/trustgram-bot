@@ -9,7 +9,7 @@ SQLAlchemy ORM models for TrustGram.
 
 from datetime import datetime, timezone
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, String, Text
+from sqlalchemy import BigInteger, DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -48,6 +48,9 @@ class PublicBundle(Base):
 
 class OneTimeKey(Base):
     __tablename__ = "one_time_keys"
+    # (user_id, key_id) uniquely identifies an OTK. Without this, a buggy or
+    # malicious client could insert duplicates and confuse session setup.
+    __table_args__ = (UniqueConstraint("user_id", "key_id", name="uq_otk_user_keyid"),)
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.telegram_id", ondelete="CASCADE"), index=True)

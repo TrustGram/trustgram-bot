@@ -54,6 +54,23 @@ async def on_startup() -> None:
         # we don't want to crash the whole backend.
         logger.warning(f"Could not set chat menu button: {e}")
 
+    # Register the webhook with a secret token so Telegram authenticates each
+    # delivery. Without a secret anyone with the URL can POST fake updates.
+    if settings.telegram_webhook_url and settings.telegram_webhook_secret:
+        try:
+            await bot.set_webhook(
+                url=settings.telegram_webhook_url,
+                secret_token=settings.telegram_webhook_secret,
+                drop_pending_updates=False,
+            )
+            logger.info(f"Webhook registered with secret token at {settings.telegram_webhook_url}")
+        except Exception as e:
+            logger.error(f"Could not register webhook: {e}")
+    elif settings.telegram_webhook_secret and not settings.telegram_webhook_url:
+        logger.warning("telegram_webhook_secret set without telegram_webhook_url — webhook not registered")
+    else:
+        logger.warning("Webhook is unauthenticated — set TELEGRAM_WEBHOOK_URL + TELEGRAM_WEBHOOK_SECRET")
+
 
 async def on_shutdown() -> None:
     """

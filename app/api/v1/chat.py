@@ -6,6 +6,9 @@ GET    /chat/inbox          — fetch all pending encrypted messages.
 DELETE /chat/message/{id}   — acknowledge & delete a consumed message.
 """
 
+import time
+
+from aiogram.exceptions import TelegramAPIError, TelegramForbiddenError
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +27,23 @@ from app.schemas.schemas import (
 )
 
 router = APIRouter(prefix="/chat", tags=["chat"])
+
+# In-process notification throttle. Maps (sender_id, recipient_id) → last-sent
+# epoch seconds. Multi-worker deployments will throttle per-worker — good
+# enough for now (worst case is N notifications per N workers per window).
+_NOTIFY_COOLDOWN_SECONDS = 60
+_last_notified: dict[tuple[int, int], float] = {}
+
+
+def _should_notify(sender_id: int, recipient_id: int) -> bool:
+    """True if we haven't pinged this recipient on behalf of this sender in the last minute."""
+    key = (sender_id, recipient_id)
+    now = time.monotonic()
+    last = _last_notified.get(key, 0.0)
+    if now - last < _NOTIFY_COOLDOWN_SECONDS:
+        return False
+    _last_notified[key] = now
+    return True
 
 
 @router.post(
@@ -54,18 +74,25 @@ async def send_message(
     )
     await db.flush()
 
-    sender = await db.get(User, sender_id)
-    sender_name = f"@{sender.username}" if sender and sender.username else str(sender_id)
+    # Metadata-minimal log: don't write the (sender, recipient) pair anywhere.
+    # The communication graph is exactly what an adversary with disk access
+    # would want; a per-message-relay counter is enough for ops.
+    logger.info("Message relayed")
 
-    logger.info(f"Message relay: {sender_id} -> {body.recipient_id}")
-
-    try:
-        await bot.send_message(
-            chat_id=body.recipient_id,
-            text=f"🔒 New encrypted message from {sender_name}\n\nOpen TrustGram to read it.",
-        )
-    except Exception:
-        pass  # recipient may not have started the bot — don't fail the send
+    if _should_notify(sender_id, body.recipient_id):
+        sender = await db.get(User, sender_id)
+        sender_name = f"@{sender.username}" if sender and sender.username else str(sender_id)
+        try:
+            await bot.send_message(
+                chat_id=body.recipient_id,
+                text=f"🔒 New encrypted message from {sender_name}\n\nOpen TrustGram to read it.",
+            )
+        except TelegramForbiddenError:
+            # Recipient hasn't started the bot or has blocked it — expected, ignore.
+            logger.debug("Notification skipped: recipient has not started the bot")
+        except TelegramAPIError as e:
+            # Real Telegram error — surface for debugging but never fail the send.
+            logger.warning("Telegram notification failed: %s", e)
 
     return StatusResponse(detail="Message delivered to inbox")
 

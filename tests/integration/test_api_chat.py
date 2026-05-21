@@ -33,6 +33,24 @@ class TestSendMessage:
         assert data["detail"] == "Message delivered to inbox"
 
     @pytest.mark.asyncio
+    async def test_notification_throttled_per_recipient(self, client: AsyncClient):
+        """Rapid follow-up messages to the same recipient must not spam Telegram."""
+        from app.api.v1 import chat as chat_mod
+        from app.bot import bot as bot_mod
+
+        chat_mod._last_notified.clear()
+        bot_mod.bot.send_message.reset_mock()
+
+        for i in range(5):
+            await client.post(
+                "/api/v1/chat/send",
+                json={"recipient_id": 99999, "encrypted_payload": f"blob_{i}"},
+            )
+        # Only the first send should have pinged Telegram; the next four are
+        # within the cooldown window.
+        assert bot_mod.bot.send_message.await_count == 1
+
+    @pytest.mark.asyncio
     async def test_send_stores_sender_id(self, client: AsyncClient):
         """
         Send a message to ourselves (recipient_id == mock user's id) and verify

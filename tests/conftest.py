@@ -28,6 +28,9 @@ _mock_bot = MagicMock()
 _mock_bot.session = MagicMock()
 _mock_bot.session.close = AsyncMock()
 _mock_bot.set_chat_menu_button = AsyncMock()
+# Used by chat.send_message to ping recipients — must be awaitable.
+_mock_bot.send_message = AsyncMock()
+_mock_bot.set_webhook = AsyncMock()
 
 _bot_patch = patch("aiogram.Bot", return_value=_mock_bot)
 _bot_patch.start()
@@ -50,7 +53,8 @@ MOCK_USER = {
     "id": 12345678,
     "first_name": "Test",
     "last_name": "User",
-    "username": "test_user",
+    # Intentionally mixed-case so tests exercise the case-preserving username path.
+    "username": "Test_User",
     "language_code": "en",
 }
 
