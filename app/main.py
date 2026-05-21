@@ -13,6 +13,7 @@ Start locally with:
     alembic upgrade head && uvicorn app.main:app --reload
 """
 
+import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -26,6 +27,7 @@ from slowapi.errors import RateLimitExceeded
 
 from app.api.v1.router import router as api_v1_router
 from app.bot.bot import bot, dp, on_shutdown, on_startup
+from app.core.cleanup import inbox_cleanup_loop
 from app.core.config import settings
 from app.core.database import Base, engine
 from app.core.logger import logger, setup_logging
@@ -54,8 +56,19 @@ async def lifespan(app: FastAPI):
 
     await on_startup()
     logger.info("Bot startup tasks completed.")
+
+    cleanup_stop = asyncio.Event()
+    cleanup_task = asyncio.create_task(inbox_cleanup_loop(cleanup_stop))
+
     yield
+
     logger.info("Application shutting down...")
+    cleanup_stop.set()
+    try:
+        await asyncio.wait_for(cleanup_task, timeout=5)
+    except asyncio.TimeoutError:
+        logger.warning("Inbox cleanup task did not stop within 5s; cancelling")
+        cleanup_task.cancel()
     await on_shutdown()
     logger.info("Shutdown sequence complete.")
 

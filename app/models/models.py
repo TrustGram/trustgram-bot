@@ -9,7 +9,7 @@ SQLAlchemy ORM models for TrustGram.
 
 from datetime import datetime, timezone
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -62,10 +62,13 @@ class OneTimeKey(Base):
 
 class Message(Base):
     __tablename__ = "messages"
+    # Composite index for inbox queries (filter recipient_id, sort timestamp).
+    # See migration 007_messages_inbox_index — supersedes the single-column index.
+    __table_args__ = (Index("messages_inbox_idx", "recipient_id", "timestamp"),)
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     recipient_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("users.telegram_id", ondelete="CASCADE"), index=True
+        BigInteger, ForeignKey("users.telegram_id", ondelete="CASCADE"),
     )
     sender_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     encrypted_payload: Mapped[str] = mapped_column(Text, nullable=False)
