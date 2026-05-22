@@ -7,10 +7,11 @@ DELETE /chat/message/{id}   — acknowledge & delete a consumed message.
 """
 
 import time
+from datetime import datetime, timezone
 
 from aiogram.exceptions import TelegramAPIError, TelegramForbiddenError
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.bot import bot
@@ -123,6 +124,23 @@ async def get_inbox(
     )
     result = await db.execute(stmt)
     rows = result.all()
+
+    # Stamp first_fetched_at so the cleanup sweeper can short-TTL these rows.
+    # Idempotent — only updates rows where the column is still NULL, so a
+    # poll/retry from the same client doesn't reset the clock. The UPDATE
+    # runs in the same transaction as the read; if the response never makes
+    # it to the client they'll just see the same messages next time (and
+    # those messages will already be stamped, which is harmless — the short
+    # TTL only fires when the cleanup sweep runs ~1 hour later).
+    if rows:
+        await db.execute(
+            update(Message)
+            .where(
+                Message.recipient_id == telegram_id,
+                Message.first_fetched_at.is_(None),
+            )
+            .values(first_fetched_at=datetime.now(timezone.utc))
+        )
 
     logger.debug(f"User {telegram_id} fetched inbox: {len(rows)} messages")
     return InboxResponse(

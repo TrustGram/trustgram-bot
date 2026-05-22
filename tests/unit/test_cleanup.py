@@ -75,6 +75,54 @@ class TestSweepOnce:
         deleted = await cleanup_module._sweep_once()
         assert deleted == 0
 
+    @pytest.mark.asyncio
+    async def test_fetched_rows_expire_on_short_ttl(self, patched_factory):
+        """Once first_fetched_at is past POST_FETCH_TTL_MINUTES, the row is purged.
+
+        The row's `timestamp` is fresh (well within the 30-day long TTL) — only
+        the post-fetch path can collect it.
+        """
+        now = datetime.now(timezone.utc)
+        stale_fetch = now - timedelta(minutes=cleanup_module.POST_FETCH_TTL_MINUTES + 1)
+        async with patched_factory() as session:
+            session.add(User(telegram_id=11, username="recipient"))
+            await session.flush()
+            session.add(
+                Message(
+                    recipient_id=11,
+                    sender_id=22,
+                    encrypted_payload="delivered-but-not-deleted",
+                    timestamp=now,  # not eligible under long TTL
+                    first_fetched_at=stale_fetch,
+                )
+            )
+            session.add(
+                Message(
+                    recipient_id=11,
+                    sender_id=22,
+                    encrypted_payload="just-delivered",
+                    timestamp=now,
+                    first_fetched_at=now,  # within the post-fetch window
+                )
+            )
+            session.add(
+                Message(
+                    recipient_id=11,
+                    sender_id=22,
+                    encrypted_payload="never-fetched",
+                    timestamp=now,
+                    first_fetched_at=None,  # still under long TTL
+                )
+            )
+            await session.commit()
+
+        deleted = await cleanup_module._sweep_once()
+        assert deleted == 1
+        async with patched_factory() as session:
+            remaining = (await session.execute(select(Message))).scalars().all()
+            payloads = {m.encrypted_payload for m in remaining}
+            assert payloads == {"just-delivered", "never-fetched"}
+
 
 class TestInboxCleanupLoop:
     @pytest.mark.asyncio

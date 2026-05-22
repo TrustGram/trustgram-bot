@@ -73,6 +73,42 @@ class TestGetInbox:
         assert resp.json()["messages"] == []
 
     @pytest.mark.asyncio
+    async def test_first_fetch_stamps_timestamp(self, client: AsyncClient, db_session):
+        """GET /inbox flips first_fetched_at from NULL → now(), idempotent on retry."""
+        from datetime import datetime, timezone
+
+        from sqlalchemy import select
+
+        from app.models.models import Message
+
+        await client.post(
+            "/api/v1/chat/send",
+            json={"recipient_id": 12345678, "encrypted_payload": "stamp_test"},
+        )
+
+        before = (await db_session.execute(select(Message))).scalars().first()
+        assert before.first_fetched_at is None
+
+        # First fetch — stamp gets set.
+        await client.get("/api/v1/chat/inbox")
+        await db_session.refresh(before)
+        first_stamp = before.first_fetched_at
+        assert first_stamp is not None
+        # Should be very recent. SQLite drops the tz info on read so normalise
+        # both sides to UTC-aware before comparing.
+        if first_stamp.tzinfo is None:
+            first_stamp_aware = first_stamp.replace(tzinfo=timezone.utc)
+        else:
+            first_stamp_aware = first_stamp
+        delta = (datetime.now(timezone.utc) - first_stamp_aware).total_seconds()
+        assert 0 <= delta < 5
+
+        # Second fetch — stamp must NOT shift (idempotent).
+        await client.get("/api/v1/chat/inbox")
+        await db_session.refresh(before)
+        assert before.first_fetched_at == first_stamp
+
+    @pytest.mark.asyncio
     async def test_inbox_contains_own_messages_only(self, client: AsyncClient):
         # Send one message to current user (12345678)
         await client.post(

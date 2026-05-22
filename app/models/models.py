@@ -77,3 +77,14 @@ class Message(Base):
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
     )
+    # Set to now() the first time GET /chat/inbox returns this row. Once set,
+    # the cleanup sweeper expires the row aggressively (POST_FETCH_TTL_MINUTES)
+    # — the client has had a chance to decrypt, so we no longer need to hold
+    # it for the full 30-day "never opened the app" window. Reduces the
+    # forensic exposure if the recipient's device is lost between fetch and
+    # explicit DELETE.
+    first_fetched_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        default=None,
+    )
