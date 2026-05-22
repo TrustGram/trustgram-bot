@@ -14,6 +14,7 @@ Start locally with:
 """
 
 import asyncio
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -146,6 +147,32 @@ app.include_router(api_v1_router, prefix=settings.api_v1_prefix)
 
 # ── Telegram webhook ─────────────────────────────────────────
 
+# Throttle the bad-secret log: under sustained scanning we'd otherwise emit a
+# WARNING per request. First N per minute stay at WARNING (still actionable),
+# the rest drop to DEBUG. Per-process state — multi-worker is fine, each
+# worker independently lets a few through.
+_WEBHOOK_WARN_WINDOW_S = 60
+_WEBHOOK_WARN_THRESHOLD = 3
+_webhook_bad_token_window_start = 0.0
+_webhook_bad_token_count = 0
+
+
+def _log_webhook_bad_token() -> None:
+    global _webhook_bad_token_window_start, _webhook_bad_token_count
+    now = time.monotonic()
+    if now - _webhook_bad_token_window_start > _WEBHOOK_WARN_WINDOW_S:
+        _webhook_bad_token_window_start = now
+        _webhook_bad_token_count = 0
+    _webhook_bad_token_count += 1
+    if _webhook_bad_token_count <= _WEBHOOK_WARN_THRESHOLD:
+        logger.warning("Webhook called with missing/invalid secret token")
+    else:
+        logger.debug(
+            "Webhook bad token (suppressed): %d hits in last %ds",
+            _webhook_bad_token_count,
+            _WEBHOOK_WARN_WINDOW_S,
+        )
+
 
 @app.post("/webhook", include_in_schema=False)
 async def telegram_webhook(
@@ -162,7 +189,7 @@ async def telegram_webhook(
     """
     expected = settings.telegram_webhook_secret
     if expected and x_telegram_bot_api_secret_token != expected:
-        logger.warning("Webhook called with missing/invalid secret token")
+        _log_webhook_bad_token()
         raise HTTPException(status_code=404, detail="Not found")
 
     data = await request.json()

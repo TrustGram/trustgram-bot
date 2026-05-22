@@ -166,9 +166,9 @@ async def delete_message(
         )
 
     if msg.recipient_id != telegram_id:
-        logger.error(
-            f"Unauthorized delete attempt: User {telegram_id} tried to delete message {message_id} belonging to {msg.recipient_id}"
-        )
+        # Counter-attack signal, not an operational error — keep at debug so we
+        # don't accumulate a who-tried-to-delete-whose-message graph in prod logs.
+        logger.debug("Unauthorized delete attempt: msg=%s requester=%s", message_id, telegram_id)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Message not found",
