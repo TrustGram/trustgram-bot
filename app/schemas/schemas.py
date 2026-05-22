@@ -18,8 +18,12 @@ KEY_ID_MAX_LEN = 64
 # ECDSA P-256 raw signature is 64 bytes → 88 base64; SPKI public key ≈ 124 base64. Allow slack.
 SIGNATURE_MAX_LEN = 256
 SIGNATURE_MIN_LEN = 64
-# Files capped at 512 KB in the UI; after base64 + JSON wrapping ≈ 720 KB. Round up to 1 MB.
-PAYLOAD_MAX_LEN = 1_048_576
+# Files capped at 512 KB in the UI. After deflate + base64 + JSON wrap ≈ 720 KB of
+# plaintext, which after bucket padding (H4) rounds up to a 1 MiB plaintext bucket;
+# the resulting AES-GCM ciphertext base64'd lands at ≈ 1.4 MiB. 2 MiB cap leaves
+# headroom for the JSON envelope and future bucket growth without rejecting valid
+# clients.
+PAYLOAD_MAX_LEN = 2_097_152
 OTK_BATCH_MAX = 100
 
 
