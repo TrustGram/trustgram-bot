@@ -15,6 +15,7 @@ from app.core.database import get_db
 from app.core.logger import logger
 from app.core.rate_limit import limiter
 from app.core.security import get_current_user
+from app.core.spk_verify import verify_spk_signature
 from app.models.models import OneTimeKey, PublicBundle, User
 from app.schemas.schemas import (
     OneTimeKeySchema,
@@ -54,6 +55,15 @@ async def register_bundle(
     a partial state (bundle without OTKs, etc.) cannot be observed by readers.
     """
     telegram_id: int = user["id"]
+
+    # Defence-in-depth: receivers re-verify, but rejecting bad signatures here
+    # keeps the OTK pool and storage clean.
+    if not verify_spk_signature(body.signing_key, body.signed_pre_key, body.signature):
+        logger.warning(f"Bundle rejected for {telegram_id}: invalid SPK signature")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid SPK signature",
+        )
 
     # Upsert user row. Username is stored with its original case for display;
     # lookups are case-insensitive (see get_bundle_by_username).
@@ -238,6 +248,17 @@ async def update_spk(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No bundle registered for this user",
+        )
+
+    # The signing key is the long-term trust anchor — it's stored at register
+    # time and never rotates here, so we verify the new SPK against the one
+    # already in the DB. A client that has the matching private signing key
+    # can rotate; nobody else can.
+    if not verify_spk_signature(bundle.signing_key, body.signed_pre_key, body.signature):
+        logger.warning(f"SPK rotation rejected for {telegram_id}: invalid signature")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid SPK signature",
         )
 
     bundle.signed_pre_key = body.signed_pre_key
