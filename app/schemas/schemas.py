@@ -73,6 +73,17 @@ class OTKCountResponse(BaseModel):
     count: int
 
 
+class BundleExistsResponse(BaseModel):
+    """GET /keys/me/exists — whether the caller still has a bundle on the server.
+
+    Lets the client self-heal after server-side data loss: if its bundle is
+    gone (e.g. the DB was reset), it re-registers. Deliberately does NOT consume
+    an OTK, unlike fetching the full bundle.
+    """
+
+    exists: bool
+
+
 class UpdateSPKRequest(BaseModel):
     """PUT /keys/spk — rotate signed pre-key without touching OTKs."""
 

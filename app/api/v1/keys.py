@@ -18,6 +18,7 @@ from app.core.security import get_current_user
 from app.core.spk_verify import verify_spk_signature
 from app.models.models import OneTimeKey, PublicBundle, User
 from app.schemas.schemas import (
+    BundleExistsResponse,
     OneTimeKeySchema,
     OTKCountResponse,
     PublicBundleResponse,
@@ -208,6 +209,26 @@ async def get_bundle(
         signature=bundle.signature,
         one_time_key=otk_out,
     )
+
+
+@router.get(
+    "/me/exists",
+    response_model=BundleExistsResponse,
+    summary="Check whether the caller still has a bundle on the server",
+)
+@limiter.limit("30/minute")
+async def bundle_exists(
+    request: Request,
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lightweight existence check used by the client to self-heal after
+    server-side data loss. Does not consume an OTK."""
+    telegram_id: int = user["id"]
+    result = await db.execute(
+        select(PublicBundle.id).where(PublicBundle.user_id == telegram_id).limit(1)
+    )
+    return BundleExistsResponse(exists=result.scalar_one_or_none() is not None)
 
 
 @router.get(

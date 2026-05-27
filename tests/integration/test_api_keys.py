@@ -381,3 +381,31 @@ class TestUsernameLookupEdgeCases:
         resp = await client.get(f"/api/v1/keys/by-username/{long_name}")
         assert resp.status_code == 400
         assert "too long" in resp.json()["detail"].lower()
+
+
+class TestBundleExists:
+    @pytest.mark.asyncio
+    async def test_false_before_register(self, client: AsyncClient):
+        resp = await client.get("/api/v1/keys/me/exists")
+        assert resp.status_code == 200
+        assert resp.json()["exists"] is False
+
+    @pytest.mark.asyncio
+    async def test_true_after_register(self, client: AsyncClient):
+        payload, _ = make_bundle()
+        await client.post("/api/v1/keys/register", json=payload)
+        resp = await client.get("/api/v1/keys/me/exists")
+        assert resp.json()["exists"] is True
+
+    @pytest.mark.asyncio
+    async def test_existence_check_does_not_consume_otk(self, client: AsyncClient):
+        """Unlike fetching the full bundle, the existence check must not pop an OTK."""
+        payload, _ = make_bundle()  # ships 2 OTKs
+        await client.post("/api/v1/keys/register", json=payload)
+
+        await client.get("/api/v1/keys/me/exists")
+        await client.get("/api/v1/keys/me/exists")
+
+        # Both OTKs are still available — neither check consumed one.
+        count = (await client.get("/api/v1/keys/otk/count")).json()["count"]
+        assert count == 2

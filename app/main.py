@@ -50,6 +50,9 @@ __version__ = _VERSION_FILE.read_text(encoding="utf-8").strip() if _VERSION_FILE
 async def lifespan(app: FastAPI):
     """Modern lifespan handler (replaces deprecated on_event)."""
     logger.info("Application starting up...")
+    # Log the DB backend (password masked) so it's clear in prod logs whether
+    # we're on persistent Postgres or an ephemeral SQLite file.
+    logger.info("Database backend: %s", engine.url.render_as_string(hide_password=True))
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
