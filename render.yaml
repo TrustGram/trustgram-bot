@@ -29,6 +29,11 @@ services:
         sync: false
       - key: WEBAPP_URL
         sync: false
+      # Telegram chat that receives bug reports (POST /feedback). Your numeric
+      # user id, or a private channel id (-100...) the bot belongs to. The
+      # target must have started the bot, otherwise delivery fails.
+      - key: ADMIN_CHAT_ID
+        sync: false
       - key: ENVIRONMENT
         value: production
       - key: DOCS_API_KEY

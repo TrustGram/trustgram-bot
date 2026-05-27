@@ -114,6 +114,30 @@ class InboxResponse(BaseModel):
 
 
 # ═══════════════════════════════════════════════════════════════
+# Feedback
+# ═══════════════════════════════════════════════════════════════
+# Bug-report fields are bounded so a single report can't blow past Telegram's
+# 4096-char message limit or be used to spam the admin channel with megabytes.
+FEEDBACK_MESSAGE_MAX_LEN = 2000
+FEEDBACK_CATEGORY_MAX_LEN = 32
+FEEDBACK_META_MAX_LEN = 64
+
+
+class FeedbackRequest(BaseModel):
+    """POST /feedback — a user-submitted bug report.
+
+    Privacy: this carries ONLY what the user typed plus client metadata. It must
+    never contain message content or key material — the UI is responsible for
+    that, the server just relays the text to the admin chat.
+    """
+
+    category: str = Field(min_length=1, max_length=FEEDBACK_CATEGORY_MAX_LEN)
+    message: str = Field(min_length=1, max_length=FEEDBACK_MESSAGE_MAX_LEN)
+    app_version: str = Field(default="", max_length=FEEDBACK_META_MAX_LEN)
+    platform: str = Field(default="", max_length=FEEDBACK_META_MAX_LEN)
+
+
+# ═══════════════════════════════════════════════════════════════
 # Generic
 # ═══════════════════════════════════════════════════════════════
 

@@ -20,6 +20,9 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
+        # Tolerate unknown keys in .env / the environment (e.g. a leftover
+        # DEBUG flag). Without this, a single unmapped key crashes startup.
+        extra="ignore",
     )
 
     # ── Telegram ──────────────────────────────────────────────
@@ -33,6 +36,10 @@ class Settings(BaseSettings):
     # rejects any request whose X-Telegram-Bot-Api-Secret-Token header doesn't
     # match. Keep this out of source control.
     telegram_webhook_secret: str | None = None
+    # Telegram chat that receives user bug reports (POST /feedback). Set to your
+    # own user id or a private channel/group the bot can post to. When unset the
+    # feedback endpoint returns 503 — reports have nowhere to go.
+    admin_chat_id: int | None = None
 
     # ── Database ──────────────────────────────────────────────
     database_url: str = "sqlite+aiosqlite:///./trustgram.db"
