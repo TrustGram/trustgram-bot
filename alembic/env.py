@@ -16,13 +16,15 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 import app.models.models  # noqa: F401
 from alembic import context
 from app.core.config import settings
-from app.core.database import Base
+from app.core.database import Base, _normalize_async_url
 
 # ── Alembic Config object ────────────────────────────────────
 config = context.config
 
-# Override the placeholder URL from alembic.ini with the real one.
-config.set_main_option("sqlalchemy.url", settings.database_url)
+# Override the placeholder URL from alembic.ini with the real one. Normalize
+# the driver so a sync Render URL (postgresql://) becomes async (asyncpg) — the
+# async engine below has no psycopg2 fallback.
+config.set_main_option("sqlalchemy.url", _normalize_async_url(settings.database_url))
 
 # Interpret the alembic.ini [loggers] section.
 if config.config_file_name is not None:
