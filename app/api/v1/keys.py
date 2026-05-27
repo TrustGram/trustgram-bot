@@ -225,9 +225,7 @@ async def bundle_exists(
     """Lightweight existence check used by the client to self-heal after
     server-side data loss. Does not consume an OTK."""
     telegram_id: int = user["id"]
-    result = await db.execute(
-        select(PublicBundle.id).where(PublicBundle.user_id == telegram_id).limit(1)
-    )
+    result = await db.execute(select(PublicBundle.id).where(PublicBundle.user_id == telegram_id).limit(1))
     return BundleExistsResponse(exists=result.scalar_one_or_none() is not None)
 
 
