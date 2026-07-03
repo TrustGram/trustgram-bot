@@ -22,6 +22,18 @@ import pytest
 from httpx import AsyncClient
 
 
+@pytest.fixture(autouse=True)
+async def _register_recipients(db_session):
+    """POST /chat/send now 404s on an unregistered recipient (FK + anti-spam),
+    so pre-create the ids these tests deliver to: 12345678 is the mock user,
+    the rest are the 'other' recipients used across the module."""
+    from app.models.models import User
+
+    for tid in (12345678, 77777777, 99999, 11111111):
+        db_session.add(User(telegram_id=tid))
+    await db_session.flush()
+
+
 class TestSendMessage:
     @pytest.mark.asyncio
     async def test_send_returns_201(self, client: AsyncClient):
@@ -31,6 +43,18 @@ class TestSendMessage:
         data = resp.json()
         assert data["ok"] is True
         assert data["detail"] == "Message delivered to inbox"
+
+    @pytest.mark.asyncio
+    async def test_send_to_unregistered_recipient_returns_404(self, client: AsyncClient):
+        """Delivering to an id with no registered user is rejected — otherwise it
+        would FK-500 on Postgres / store an undeliverable orphan row on SQLite."""
+        # 55555 is deliberately NOT in the _register_recipients fixture.
+        resp = await client.post(
+            "/api/v1/chat/send",
+            json={"recipient_id": 55555, "encrypted_payload": "blob"},
+        )
+        assert resp.status_code == 404
+        assert resp.json()["detail"] == "Recipient not found"
 
     @pytest.mark.asyncio
     async def test_notification_throttled_per_recipient(self, client: AsyncClient):

@@ -21,7 +21,7 @@ services:
     envVars:
       - key: DATABASE_URL
         fromDatabase:
-          name: trustgram-db
+          name: trustgram-db-v2
           property: connectionString
         # Render gives a psycopg2 URL — override to asyncpg at deploy time.
         # See deployment docs for the manual step.
@@ -46,7 +46,7 @@ services:
         value: "INFO"
 
 databases:
-  - name: trustgram-db
+  - name: trustgram-db-v2
     plan: free
     databaseName: trustgram
     user: trustgram

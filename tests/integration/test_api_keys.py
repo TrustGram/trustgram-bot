@@ -32,6 +32,7 @@ import pytest
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, utils
 from httpx import AsyncClient
+from sqlalchemy import func, select
 
 IK_DEFAULT = "base64_ik_default"
 
@@ -214,6 +215,66 @@ class TestGetBundle:
         resp = await client.get("/api/v1/keys/99999999")
         assert resp.status_code == 404
         assert resp.json()["detail"] == "User has no registered bundle"
+
+
+class TestOTKAtomicConsumption:
+    """BOT-1: a one-time pre-key must never be handed to two initiators.
+
+    Reusing an OPK across two X3DH sessions silently weakens the initial
+    forward secrecy of both, so consumption must be an atomic pop. True
+    cross-transaction concurrency can't be reproduced on the serialised
+    in-memory SQLite the suite uses, so these tests pin the invariants the
+    atomic ``DELETE ... RETURNING`` path must uphold: each consumed key is
+    distinct, the backing row is actually deleted (never re-served), and the
+    pool drains cleanly to empty per user.
+    """
+
+    @pytest.mark.asyncio
+    async def test_consume_pops_distinct_keys_until_empty(self, db_session):
+        from app.api.v1.keys import _consume_one_otk
+        from app.models.models import OneTimeKey, User
+
+        uid = 4242
+        db_session.add(User(telegram_id=uid, username=None))
+        for i in range(5):
+            db_session.add(OneTimeKey(user_id=uid, key_id=f"k{i}", public_key=f"pk{i}"))
+        await db_session.flush()
+
+        seen = []
+        for _ in range(5):
+            otk = await _consume_one_otk(db_session, uid)
+            assert otk is not None
+            seen.append(otk.key_id)
+
+        # Every pop returned a different key ...
+        assert len(set(seen)) == 5
+        # ... the pool is now drained ...
+        assert await _consume_one_otk(db_session, uid) is None
+        # ... and the rows were really deleted, not just hidden.
+        remaining = await db_session.scalar(
+            select(func.count()).select_from(OneTimeKey).where(OneTimeKey.user_id == uid)
+        )
+        assert remaining == 0
+
+    @pytest.mark.asyncio
+    async def test_consume_is_scoped_per_user(self, db_session):
+        """Popping one user's OTK must not touch another user's pool."""
+        from app.api.v1.keys import _consume_one_otk
+        from app.models.models import OneTimeKey, User
+
+        db_session.add(User(telegram_id=1, username=None))
+        db_session.add(User(telegram_id=2, username=None))
+        db_session.add(OneTimeKey(user_id=1, key_id="a", public_key="pka"))
+        db_session.add(OneTimeKey(user_id=2, key_id="b", public_key="pkb"))
+        await db_session.flush()
+
+        popped = await _consume_one_otk(db_session, 1)
+        assert popped is not None and popped.key_id == "a"
+        # User 1's pool is now empty ...
+        assert await _consume_one_otk(db_session, 1) is None
+        # ... while user 2's key is untouched.
+        other = await _consume_one_otk(db_session, 2)
+        assert other is not None and other.key_id == "b"
 
 
 class TestUsernameValidation:

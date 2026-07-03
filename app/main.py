@@ -115,10 +115,13 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
+    # Log the full exception server-side, but never echo its type/message to the
+    # client. For a zero-trust product, leaking e.g. asyncpg errors (table names,
+    # constraint names, internal state) is needless information disclosure.
     logger.exception("Unhandled exception on %s %s: %s", request.method, request.url.path, exc)
     return JSONResponse(
         status_code=500,
-        content={"detail": f"{type(exc).__name__}: {exc}"},
+        content={"detail": "Internal server error"},
     )
 
 

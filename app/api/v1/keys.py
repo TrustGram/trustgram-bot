@@ -31,6 +31,42 @@ from app.schemas.schemas import (
 router = APIRouter(prefix="/keys", tags=["keys"])
 
 
+async def _consume_one_otk(db: AsyncSession, telegram_id: int) -> OneTimeKeySchema | None:
+    """Atomically pop a single one-time pre-key from a user's pool.
+
+    A one-time pre-key must be handed to **at most one** initiator: reusing an
+    OPK across two X3DH sessions silently weakens the initial forward secrecy
+    of both. A naive ``SELECT ... LIMIT 1`` followed by ``db.delete(row)`` is
+    *not* safe under PostgreSQL's default READ COMMITTED isolation — two
+    concurrent ``GET /keys/{id}`` requests can each read the same row before
+    either commits its delete, so the same OPK leaks to both callers.
+
+    Instead we delete-and-return in a single statement:
+
+    - On **PostgreSQL** the inner ``SELECT`` takes a row lock with
+      ``FOR UPDATE SKIP LOCKED``, so concurrent poppers skip each other's
+      locked rows and each receives a distinct OPK (or ``None`` once drained).
+    - On **SQLite** (dev/tests) writes are serialised at the database level, so
+      the single-statement ``DELETE ... RETURNING`` is already atomic; the
+      row-lock hint is simply omitted (SQLite has no ``FOR UPDATE``).
+
+    Returns the consumed key, or ``None`` when the pool is exhausted.
+    """
+    inner = select(OneTimeKey.id).where(OneTimeKey.user_id == telegram_id).order_by(OneTimeKey.id).limit(1)
+    if db.bind.dialect.name == "postgresql":
+        inner = inner.with_for_update(skip_locked=True)
+
+    stmt = (
+        delete(OneTimeKey)
+        .where(OneTimeKey.id == inner.scalar_subquery())
+        .returning(OneTimeKey.key_id, OneTimeKey.public_key)
+    )
+    row = (await db.execute(stmt)).first()
+    if row is None:
+        return None
+    return OneTimeKeySchema(key_id=row.key_id, public_key=row.public_key)
+
+
 @router.post(
     "/register",
     response_model=StatusResponse,
@@ -187,16 +223,10 @@ async def get_bundle(
     user_result = await db.execute(select(User).where(User.telegram_id == telegram_id))
     user = user_result.scalar_one_or_none()
 
-    # Pop one OTK (first-come, first-served).
-    otk_stmt = select(OneTimeKey).where(OneTimeKey.user_id == telegram_id).limit(1)
-    otk_result = await db.execute(otk_stmt)
-    otk = otk_result.scalar_one_or_none()
-
-    otk_out: OneTimeKeySchema | None = None
-    if otk:
-        logger.debug(f"Consuming OTK {otk.key_id} for user {telegram_id}")
-        otk_out = OneTimeKeySchema(key_id=otk.key_id, public_key=otk.public_key)
-        await db.delete(otk)
+    # Pop one OTK (first-come, first-served) atomically — see _consume_one_otk.
+    otk_out = await _consume_one_otk(db, telegram_id)
+    if otk_out is not None:
+        logger.debug(f"Consuming OTK {otk_out.key_id} for user {telegram_id}")
     else:
         logger.warning(f"User {telegram_id} has exhausted all One-Time Keys!")
 

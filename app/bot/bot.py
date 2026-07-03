@@ -25,7 +25,14 @@ async def fallback_handler(message: types.Message) -> None:
     Catch-all handler — nudges users toward the Mini App instead of
     interacting via the regular chat interface.
     """
-    logger.info(f"Received message from user {message.from_user.id}: {message.text[:50]}...")
+    # Non-text updates (stickers, photos, documents, service messages) have
+    # message.text == None, and channel posts have from_user == None. Guard both
+    # so the catch-all never raises TypeError — an unhandled error here would
+    # bubble out of dp.feed_update into /webhook and 500 back to Telegram, which
+    # then retries the update.
+    user_id = message.from_user.id if message.from_user else "unknown"
+    preview = (message.text or "")[:50]
+    logger.info(f"Received message from user {user_id}: {preview}...")
     await message.answer(
         "👋 Open TrustGram using the button below to start a secure conversation.",
     )

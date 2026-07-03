@@ -161,7 +161,9 @@ class TestUnhandledExceptionHandler:
         """
         The catch-all exception handler must turn uncaught errors into a JSON
         500 (so CORS headers flow back through the middleware stack and the
-        browser sees the real cause instead of a CORS error).
+        browser sees a proper response instead of a CORS error) — while NOT
+        leaking the exception type/message to the client (that detail is logged
+        server-side only).
 
         We need a transport with raise_app_exceptions=False — by default httpx's
         ASGITransport re-raises any exception that bubbles past the registered
@@ -186,8 +188,10 @@ class TestUnhandledExceptionHandler:
                     response = await ac.post("/webhook", json=_FAKE_UPDATE)
             assert response.status_code == 500
             body = response.json()
-            assert "RuntimeError" in body["detail"]
-            assert "kaboom" in body["detail"]
+            # Generic body only — the exception type/message must NOT leak.
+            assert body["detail"] == "Internal server error"
+            assert "RuntimeError" not in body["detail"]
+            assert "kaboom" not in body["detail"]
         finally:
             app.dependency_overrides.clear()
 

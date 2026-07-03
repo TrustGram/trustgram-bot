@@ -28,6 +28,22 @@ class TestFallbackHandler:
         call_args = mock_message.answer.call_args[0][0]
         assert "TrustGram" in call_args
 
+    @pytest.mark.asyncio
+    async def test_fallback_handler_handles_non_text_update(self):
+        """Non-text updates (text=None) and channel posts (from_user=None) must
+        not raise TypeError — the handler still replies with the nudge. Guards
+        against a 500 bubbling out of /webhook (which makes Telegram retry)."""
+        from app.bot.bot import fallback_handler
+
+        mock_message = MagicMock()
+        mock_message.text = None
+        mock_message.from_user = None
+        mock_message.answer = AsyncMock()
+
+        await fallback_handler(mock_message)
+
+        mock_message.answer.assert_called_once()
+
 
 class TestOnStartup:
     @pytest.mark.asyncio

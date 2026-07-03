@@ -66,6 +66,19 @@ async def send_message(
     """
     sender_id: int = user["id"]
 
+    # Reject sends to an unregistered recipient. On PostgreSQL the recipient FK
+    # would raise an IntegrityError → uncaught 500; on SQLite (FK enforcement
+    # off) it would silently store an orphan row that no one can ever fetch.
+    # Either way an unregistered id has no keys and could never decrypt, so this
+    # is a real error — and validating here also stops the notification path
+    # from pinging arbitrary Telegram ids.
+    recipient = await db.get(User, body.recipient_id)
+    if recipient is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Recipient not found",
+        )
+
     db.add(
         Message(
             recipient_id=body.recipient_id,
