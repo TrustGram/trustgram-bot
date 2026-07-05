@@ -26,22 +26,36 @@ Its primary role is to act as a **Zero-Trust Key Server and Message Relay**. It 
 
 ### 🔑 Key Management
 
-- `POST /api/v1/keys/register`: Initial upload of the public bundle.
-- `GET /api/v1/keys/{telegram_id}`: Fetch Bob's bundle to start an X3DH session.
+- `POST /api/v1/keys/register`: Initial upload of the public bundle (identity key, signing key, signed pre-key, signature, one-time pre-keys). Idempotent upsert — also used for key rotation / self-heal.
+- `GET /api/v1/keys/{telegram_id}`: Fetch a user's bundle to start an X3DH session — **consumes one OTK** atomically.
+- `GET /api/v1/keys/by-username/{username}`: Same, looked up case-insensitively by username.
+- `GET /api/v1/keys/me/exists`: Whether the caller still has a bundle on the server (self-heal check — does **not** consume an OTK).
+- `GET /api/v1/keys/otk/count`: Remaining one-time pre-key count for the caller.
+- `PUT /api/v1/keys/spk`: Rotate the signed pre-key (verified against the stored signing key) without touching OTKs.
 - `POST /api/v1/keys/otk`: Refill one-time pre-keys when they run low.
 
 ### ✉️ Messaging
 
-- `POST /api/v1/chat/send`: Upload an encrypted blob for a recipient.
-- `GET /api/v1/chat/inbox`: Fetch pending encrypted messages.
-- `DELETE /api/v1/chat/message/{id}`: Acknowledge and remove message from server.
+- `POST /api/v1/chat/send`: Upload an encrypted blob for a recipient (must be a registered user).
+- `GET /api/v1/chat/inbox`: Fetch pending encrypted messages (stamps `first_fetched_at`).
+- `DELETE /api/v1/chat/message/{id}`: Acknowledge and remove a message from the server (own messages only).
+
+### 🛠️ Meta
+
+- `GET /api/v1/me`: The authenticated Telegram user.
+- `POST /api/v1/feedback`: Relay a bug report to the admin chat (`ADMIN_CHAT_ID`).
+- `GET /health`: Liveness probe.
+- `POST /webhook`: Telegram update webhook (secret-token authenticated).
+- `/docs`, `/redoc`, `/openapi.json`: Interactive docs — gated by `X-Docs-Key` in production.
 
 ## Database Schema (MVP)
 
 - **Users**: `telegram_id`, `username`, `registration_date`.
-- **PublicBundles**: `user_id`, `identity_key`, `signed_pre_key`, `signature`.
-- **OneTimeKeys**: `user_id`, `key_id`, `public_key`.
-- **Messages**: `id`, `recipient_id`, `sender_id`, `encrypted_payload`, `timestamp`.
+- **PublicBundles**: `user_id`, `identity_key`, `signing_key`, `signed_pre_key`, `signature`.
+- **OneTimeKeys**: `user_id`, `key_id`, `public_key` — `UNIQUE(user_id, key_id)`.
+- **Messages**: `id`, `recipient_id`, `sender_id`, `encrypted_payload`, `timestamp`, `first_fetched_at`.
+
+> `signing_key` (ECDSA) is the long-term trust anchor: signed pre-keys are verified against it, so a malicious relay can't swap a user's SPK. `first_fetched_at` lets the cleanup sweeper short-TTL messages once they've been delivered.
 
 ## Getting Started
 
@@ -134,7 +148,7 @@ uvicorn app.main:app --reload
 
 ```bash
 curl http://127.0.0.1:8000/health
-# → {"status":"ok","service":"TrustGram"}
+# → {"status":"ok","service":"TrustGram","version":"<VERSION>"}
 ```
 
 ## Testing the API (Frontend-Free)
